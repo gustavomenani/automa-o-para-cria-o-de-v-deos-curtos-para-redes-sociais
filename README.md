@@ -26,12 +26,14 @@ cp .env.example .env
 docker compose up -d
 ```
 
+O container expoe o Postgres em `localhost:5433` para evitar conflito com instalacoes locais usando `5432`.
+
 3. Instale dependencias e prepare o banco:
 
 ```bash
 npm install
 npm run prisma:generate
-npm run prisma:migrate
+npm run prisma:deploy
 ```
 
 4. Garanta que o FFmpeg esteja instalado e acessivel via `ffmpeg`, ou ajuste `FFMPEG_PATH` no `.env`.
@@ -117,7 +119,7 @@ Para aplicar a migration apos subir o Docker:
 ```bash
 docker compose up -d
 npm run prisma:generate
-npm run prisma:migrate
+npm run prisma:deploy
 ```
 
 Se quiser inspecionar o banco:
@@ -244,7 +246,7 @@ npm install
 copy .env.example .env
 docker compose up -d
 npm run prisma:generate
-npm run prisma:migrate
+npm run prisma:deploy
 npm run dev
 ```
 

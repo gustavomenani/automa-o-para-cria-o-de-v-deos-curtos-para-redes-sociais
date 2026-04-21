@@ -77,10 +77,6 @@ function runProcess(command: string, args: string[]) {
   });
 }
 
-function escapeConcatPath(filePath: string) {
-  return filePath.replace(/\\/g, "/").replace(/'/g, "'\\''");
-}
-
 function escapeFilterPath(filePath: string) {
   return filePath
     .replace(/\\/g, "/")
@@ -265,19 +261,8 @@ export class VideoService {
 
     const imageDuration = Math.max(input.audioDuration / input.images.length, 0.1);
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "short-video-"));
-    const concatFile = path.join(tempDir, "images.txt");
 
     try {
-      const concatBody = input.images
-        .flatMap((imagePath) => [
-          `file '${escapeConcatPath(imagePath)}'`,
-          `duration ${imageDuration.toFixed(6)}`,
-        ])
-        .concat(`file '${escapeConcatPath(input.images.at(-1) ?? input.images[0])}'`)
-        .join("\n");
-
-      await fs.writeFile(concatFile, concatBody);
-
       const caption = wrapCaptionText(input.captionText);
       const captionFile = caption ? path.join(tempDir, "caption.txt") : null;
 
@@ -285,34 +270,38 @@ export class VideoService {
         await fs.writeFile(captionFile, caption, "utf8");
       }
 
-      const videoFilter = [
-        "scale=1080:1920:force_original_aspect_ratio=increase",
-        "crop=1080:1920",
-        "setsar=1",
+      const imageInputArgs = input.images.flatMap((imagePath) => [
+        "-loop",
+        "1",
+        "-t",
+        imageDuration.toFixed(6),
+        "-i",
+        imagePath,
+      ]);
+      const imageFilters = input.images.map(
+        (_, index) =>
+          `[${index}:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,format=yuv420p[v${index}]`,
+      );
+      const concatInputs = input.images.map((_, index) => `[v${index}]`).join("");
+      const baseFilter = `${concatInputs}concat=n=${input.images.length}:v=1:a=0,trim=duration=${input.audioDuration.toFixed(3)},setpts=PTS-STARTPTS[basev]`;
+      const outputFilter = [
         captionFile
-          ? `drawtext=textfile='${escapeFilterPath(captionFile)}':x=(w-text_w)/2:y=h-text_h-260:fontsize=58:fontcolor=white:line_spacing=12:box=1:boxcolor=black@0.55:boxborderw=30`
-          : null,
-        "format=yuv420p",
-      ]
-        .filter(Boolean)
-        .join(",");
+          ? `[basev]drawtext=textfile='${escapeFilterPath(captionFile)}':x=(w-text_w)/2:y=h-text_h-260:fontsize=58:fontcolor=white:line_spacing=12:box=1:boxcolor=black@0.55:boxborderw=30,format=yuv420p[outv]`
+          : "[basev]format=yuv420p[outv]",
+      ];
+      const filterComplex = [...imageFilters, baseFilter, ...outputFilter].join(";");
 
       await runProcess(getFfmpegPath(), [
         "-y",
-        "-f",
-        "concat",
-        "-safe",
-        "0",
-        "-i",
-        concatFile,
+        ...imageInputArgs,
         "-i",
         input.audio,
-        "-vf",
-        videoFilter,
+        "-filter_complex",
+        filterComplex,
         "-map",
-        "0:v:0",
+        "[outv]",
         "-map",
-        "1:a:0",
+        `${input.images.length}:a:0`,
         "-t",
         input.audioDuration.toFixed(3),
         "-r",
