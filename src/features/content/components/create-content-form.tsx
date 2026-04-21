@@ -1,5 +1,5 @@
 import { createContentAction } from "@/features/content/actions";
-import { Save, Wand2 } from "lucide-react";
+import { SubmitButton } from "@/components/submit-button";
 
 export function CreateContentForm() {
   return (
@@ -100,22 +100,23 @@ export function CreateContentForm() {
       </div>
 
       <div className="flex flex-col justify-end gap-3 sm:flex-row">
-        <button
+        <SubmitButton
           name="intent"
           value="save"
-          className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-stone-100"
+          pendingLabel="Salvando..."
+          icon="save"
+          variant="secondary"
         >
-          <Save size={16} />
           Salvar projeto
-        </button>
-        <button
+        </SubmitButton>
+        <SubmitButton
           name="intent"
           value="generate"
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800"
+          pendingLabel="Salvando e gerando..."
+          icon="wand"
         >
-          <Wand2 size={16} />
           Salvar e gerar video
-        </button>
+        </SubmitButton>
       </div>
     </form>
   );

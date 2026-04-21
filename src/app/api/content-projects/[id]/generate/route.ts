@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { videoService } from "@/features/video/video-service";
+import { apiCreated, apiError } from "@/lib/api-response";
+import { videoService } from "@/features/video/services/video-service";
 
 export const runtime = "nodejs";
 
@@ -24,13 +24,8 @@ export async function POST(
     const captionText = await getCaptionOverride(request);
     const video = await videoService.generateProjectVideo(id, { captionText });
 
-    return NextResponse.json({ video }, { status: 201 });
+    return apiCreated({ video });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Falha ao gerar video.",
-      },
-      { status: 400 },
-    );
+    return apiError(error, "Falha ao gerar video.");
   }
 }

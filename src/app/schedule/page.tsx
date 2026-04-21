@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { CalendarClock, ExternalLink, PlusCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FeedbackBanner } from "@/components/feedback-banner";
 import { getScheduledPosts } from "@/features/schedule/queries";
+import { formatDateTime } from "@/lib/formatters";
 import { toPublicFileUrl } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +22,12 @@ const statusLabels = {
   CANCELED: "Cancelado",
 };
 
-export default async function SchedulePage() {
+export default async function SchedulePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scheduled?: string }>;
+}) {
+  const feedback = await searchParams;
   const scheduledPosts = await getScheduledPosts();
 
   return (
@@ -45,6 +52,14 @@ export default async function SchedulePage() {
           </Link>
         </div>
 
+        {feedback.scheduled ? (
+          <FeedbackBanner
+            type="success"
+            title="Postagem agendada"
+            message="O agendamento foi salvo no banco. Nenhuma rede social foi acionada."
+          />
+        ) : null}
+
         {scheduledPosts.length === 0 ? (
           <section className="rounded-lg border border-dashed border-stone-300 bg-white p-10 text-center">
             <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-stone-100 text-teal-700">
@@ -60,6 +75,7 @@ export default async function SchedulePage() {
             <div className="divide-y divide-stone-200">
               {scheduledPosts.map((post) => {
                 const videoPath = post.project.generatedVideos[0]?.path;
+                const scheduled = formatDateTime(post.scheduledAt);
 
                 return (
                   <article
@@ -68,14 +84,9 @@ export default async function SchedulePage() {
                   >
                     <div>
                       <p className="text-sm font-semibold text-zinc-950">
-                        {post.scheduledAt.toLocaleDateString("pt-BR")}
+                        {scheduled.date}
                       </p>
-                      <p className="mt-1 text-sm text-zinc-500">
-                        {post.scheduledAt.toLocaleTimeString("pt-BR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
+                      <p className="mt-1 text-sm text-zinc-500">{scheduled.time}</p>
                     </div>
 
                     <div>

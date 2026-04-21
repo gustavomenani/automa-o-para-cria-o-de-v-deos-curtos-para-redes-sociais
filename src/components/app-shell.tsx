@@ -51,7 +51,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
             <Clapperboard size={20} className="text-teal-700" />
             Short Videos
@@ -63,6 +63,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Novo
           </Link>
         </div>
+        <nav className="mt-3 flex gap-2 overflow-x-auto pb-1">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="inline-flex shrink-0 items-center gap-2 rounded-md border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-zinc-700"
+            >
+              <item.icon size={14} />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
       </header>
 
       <main className="lg:pl-72">

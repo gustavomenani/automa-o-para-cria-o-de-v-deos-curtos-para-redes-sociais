@@ -1,19 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   createProjectWithUploads,
   parseProjectFormData,
-} from "@/features/content/upload-service";
+} from "@/features/content/services/upload-service";
+import { apiCreated, apiError } from "@/lib/api-response";
 
 export const runtime = "nodejs";
-
-function errorResponse(error: unknown) {
-  return NextResponse.json(
-    {
-      error: error instanceof Error ? error.message : "Falha ao processar upload.",
-    },
-    { status: 400 },
-  );
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,14 +13,8 @@ export async function POST(request: NextRequest) {
     const { input, files } = parseProjectFormData(formData);
     const project = await createProjectWithUploads(input, files);
 
-    return NextResponse.json(
-      {
-        project,
-        files: project.mediaFiles,
-      },
-      { status: 201 },
-    );
+    return apiCreated({ project, files: project.mediaFiles });
   } catch (error) {
-    return errorResponse(error);
+    return apiError(error, "Falha ao processar upload.");
   }
 }

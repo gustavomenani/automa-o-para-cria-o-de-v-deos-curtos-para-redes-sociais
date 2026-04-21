@@ -1,19 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import {
   attachMediaFilesToProject,
   filesFromFormData,
-} from "@/features/content/upload-service";
+} from "@/features/content/services/upload-service";
+import { apiCreated, apiError } from "@/lib/api-response";
 
 export const runtime = "nodejs";
-
-function errorResponse(error: unknown, status = 400) {
-  return NextResponse.json(
-    {
-      error: error instanceof Error ? error.message : "Falha ao processar upload.",
-    },
-    { status },
-  );
-}
 
 export async function POST(
   request: NextRequest,
@@ -25,7 +17,7 @@ export async function POST(
     const audioFiles = filesFromFormData(formData, "audio");
 
     if (audioFiles.length > 1) {
-      return errorResponse(new Error("Envie apenas um arquivo de audio."));
+      return apiError(new Error("Envie apenas um arquivo de audio."), "Falha ao processar upload.");
     }
 
     const mediaFiles = await attachMediaFilesToProject(id, {
@@ -33,8 +25,8 @@ export async function POST(
       audio: audioFiles[0],
     });
 
-    return NextResponse.json({ mediaFiles }, { status: 201 });
+    return apiCreated({ mediaFiles });
   } catch (error) {
-    return errorResponse(error);
+    return apiError(error, "Falha ao processar upload.");
   }
 }

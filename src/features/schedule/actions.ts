@@ -75,5 +75,5 @@ export async function schedulePostAction(formData: FormData) {
   revalidatePath("/schedule");
   revalidatePath("/contents");
   revalidatePath(`/contents/${project.id}`);
-  redirect("/schedule");
+  redirect("/schedule?scheduled=1");
 }

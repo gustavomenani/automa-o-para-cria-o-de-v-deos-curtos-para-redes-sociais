@@ -68,21 +68,29 @@ npm run dev
 ```txt
 src/
   app/
-    api/files/              # entrega segura dos arquivos locais
+    api/                    # API routes do App Router
     contents/               # criacao, revisao e historico
-    page.tsx                # dashboard
+    dashboard/              # visao geral
+    schedule/               # agendamentos salvos
+    settings/               # configuracoes e Manus
   components/               # componentes reutilizaveis de UI
   features/
     content/                # dominio principal do MVP
       actions.ts            # server actions do fluxo
       queries.ts            # consultas Prisma
+      services/             # upload e persistencia de midias
       components/           # componentes especificos do dominio
       types.ts
+    schedule/               # actions e queries de agendamento
+    settings/               # actions e queries de configuracao
+    video/
+      services/             # VideoService com FFmpeg/ffprobe
   integrations/
     manus/                  # stub para integracao futura
     social/                 # stub para publicacao/agendamento futuro
   lib/
-    ffmpeg/                 # servico isolado de geracao de video
+    api-response.ts         # respostas padronizadas de API
+    formatters.ts           # formatadores compartilhados
     storage/                # storage local substituivel por S3/R2
     paths.ts
     prisma.ts
@@ -161,7 +169,7 @@ Validacao:
 
 ## Geracao de video
 
-A geracao fica isolada em `src/features/video/video-service.ts`, na classe `VideoService`.
+A geracao fica isolada em `src/features/video/services/video-service.ts`, na classe `VideoService`.
 
 Fluxo:
 
@@ -220,7 +228,42 @@ As configuracoes da Manus ficam em `/settings` e sao salvas em `manus_settings`:
 ## Decisoes de arquitetura
 
 - `features/content` concentra o fluxo principal para evitar espalhar regra de negocio pelas paginas.
-- `features/video/video-service.ts` isola a chamada ao FFmpeg. Esse modulo pode virar um worker/fila depois sem mudar as telas.
+- `features/video/services/video-service.ts` isola a chamada ao FFmpeg. Esse modulo pode virar um worker/fila depois sem mudar as telas.
 - `lib/storage/local-storage.ts` encapsula gravacao em disco. Uma futura migracao para S3/R2 deve preservar a mesma ideia de contrato.
 - `integrations/manus` e `integrations/social` existem apenas como interfaces/stubs. Nenhuma chamada externa real e feita no MVP.
 - O banco salva projetos, arquivos de midia, videos gerados, contas sociais e agendamentos futuros.
+
+## Rodando do zero
+
+Em uma maquina nova:
+
+```bash
+git clone https://github.com/gustavomenani/automa-o-para-cria-o-de-v-deos-curtos-para-redes-sociais.git
+cd automa-o-para-cria-o-de-v-deos-curtos-para-redes-sociais
+npm install
+copy .env.example .env
+docker compose up -d
+npm run prisma:generate
+npm run prisma:migrate
+npm run dev
+```
+
+No Windows deste projeto, o `.env.example` ja aponta para:
+
+```env
+FFMPEG_PATH="C:/ffmpeg/bin/ffmpeg.exe"
+FFPROBE_PATH="C:/ffmpeg/bin/ffprobe.exe"
+```
+
+Depois acesse `http://localhost:3000/dashboard`.
+
+Fluxo manual para validar:
+
+1. Abra `/contents/new`.
+2. Preencha titulo, prompt, tipo e legenda.
+3. Envie imagens e um audio.
+4. Clique em `Salvar e gerar video`.
+5. Revise em `/contents/[id]`.
+6. Baixe o video gerado.
+7. Preencha plataforma, data, horario e caption.
+8. Salve o agendamento e confira em `/schedule`.

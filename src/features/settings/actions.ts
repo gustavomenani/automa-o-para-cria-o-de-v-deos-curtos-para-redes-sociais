@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
@@ -57,4 +58,5 @@ export async function saveManusSettingsAction(formData: FormData) {
   }
 
   revalidatePath("/settings");
+  redirect("/settings?saved=1");
 }

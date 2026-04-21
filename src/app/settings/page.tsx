@@ -1,11 +1,18 @@
-import { Bot, KeyRound, Save, Settings, ShieldCheck } from "lucide-react";
+import { Bot, KeyRound, Settings, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FeedbackBanner } from "@/components/feedback-banner";
+import { SubmitButton } from "@/components/submit-button";
 import { saveManusSettingsAction } from "@/features/settings/actions";
 import { getManusSettings } from "@/features/settings/queries";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string }>;
+}) {
+  const feedback = await searchParams;
   const manusSettings = await getManusSettings();
 
   return (
@@ -20,6 +27,14 @@ export default async function SettingsPage() {
             Prepare credenciais e padroes para a futura integracao com Manus e redes sociais.
           </p>
         </div>
+
+        {feedback.saved ? (
+          <FeedbackBanner
+            type="success"
+            title="Configuracoes salvas"
+            message="As preferencias foram atualizadas no banco local."
+          />
+        ) : null}
 
         <section className="grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border border-stone-200 bg-white p-5">
@@ -191,10 +206,9 @@ export default async function SettingsPage() {
           </section>
 
           <div className="flex justify-end">
-            <button className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800">
-              <Save size={16} />
+            <SubmitButton icon="save" pendingLabel="Salvando configuracoes...">
               Salvar configuracoes
-            </button>
+            </SubmitButton>
           </div>
         </form>
 

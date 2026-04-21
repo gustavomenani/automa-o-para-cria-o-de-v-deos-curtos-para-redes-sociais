@@ -9,33 +9,27 @@ import {
   Music2,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FeedbackBanner } from "@/components/feedback-banner";
 import { StatusBadge } from "@/components/status-badge";
+import { SubmitButton } from "@/components/submit-button";
 import { GenerateVideoButton } from "@/features/content/components/generate-video-button";
 import { generateContentVideoAction } from "@/features/content/actions";
 import { getContentById } from "@/features/content/queries";
 import { schedulePostAction } from "@/features/schedule/actions";
+import { formatContentType, formatFileSize } from "@/lib/formatters";
 import { toPublicFileUrl } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
 
-function formatContentType(contentType: string) {
-  return contentType.toLowerCase().replace("_", " ");
-}
-
-function formatFileSize(size: number) {
-  if (size < 1024 * 1024) {
-    return `${Math.max(size / 1024, 1).toFixed(0)} KB`;
-  }
-
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-}
-
 export default async function ContentDetailsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ created?: string; generated?: string }>;
 }) {
   const { id } = await params;
+  const feedback = await searchParams;
   const content = await getContentById(id);
 
   if (!content) {
@@ -59,6 +53,22 @@ export default async function ContentDetailsPage({
           <ArrowLeft size={16} />
           Voltar para conteudos
         </Link>
+
+        {feedback.created ? (
+          <FeedbackBanner
+            type="success"
+            title="Projeto salvo"
+            message="As midias foram enviadas e vinculadas ao projeto."
+          />
+        ) : null}
+
+        {feedback.generated ? (
+          <FeedbackBanner
+            type="success"
+            title="Video gerado"
+            message="O MP4 vertical foi salvo e ja pode ser revisado ou baixado."
+          />
+        ) : null}
 
         <section className="rounded-lg border border-stone-200 bg-white p-5">
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
@@ -247,13 +257,14 @@ export default async function ContentDetailsPage({
                   />
                 </div>
 
-                <button
+                <SubmitButton
                   disabled={!videoUrl}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                  fullWidth
+                  icon="calendar"
+                  pendingLabel="Salvando agendamento..."
                 >
-                  <CalendarClock size={16} />
                   Salvar agendamento
-                </button>
+                </SubmitButton>
               </form>
 
               {!videoUrl ? (
