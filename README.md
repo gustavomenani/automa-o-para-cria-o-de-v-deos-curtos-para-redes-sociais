@@ -196,6 +196,27 @@ Na tela `/contents/[id]`, depois que houver video gerado, o usuario pode escolhe
 
 Ao salvar, o sistema cria um `ScheduledPost`, atualiza o projeto para `SCHEDULED` e mostra o item em `/schedule`.
 
+## Manus
+
+A integracao futura com Manus fica preparada em `src/integrations/manus/manus-service.ts`.
+
+O service expõe:
+
+- `createTask(prompt)`
+- `getTaskStatus(taskId)`
+- `listTaskMessages(taskId)`
+- `downloadGeneratedFiles(taskId)`
+
+Por enquanto todos os metodos retornam dados mockados. Quando a API real estiver disponivel, a troca deve ficar concentrada dentro de `ManusService`.
+
+As configuracoes da Manus ficam em `/settings` e sao salvas em `manus_settings`:
+
+- API Key
+- preferencia de modelo
+- preferencia de prompt
+- configuracao padrao para Reels
+- configuracao padrao para Stories
+
 ## Decisoes de arquitetura
 
 - `features/content` concentra o fluxo principal para evitar espalhar regra de negocio pelas paginas.
