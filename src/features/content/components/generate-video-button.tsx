@@ -3,7 +3,7 @@
 import { useFormStatus } from "react-dom";
 import { Wand2 } from "lucide-react";
 
-export function GenerateVideoButton() {
+export function GenerateVideoButton({ hasVideo = false }: { hasVideo?: boolean }) {
   const { pending } = useFormStatus();
 
   return (
@@ -12,7 +12,7 @@ export function GenerateVideoButton() {
       className="inline-flex items-center gap-2 rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <Wand2 size={16} />
-      {pending ? "Gerando..." : "Gerar MP4 vertical"}
+      {pending ? "Gerando..." : hasVideo ? "Gerar novamente" : "Gerar video"}
     </button>
   );
 }
