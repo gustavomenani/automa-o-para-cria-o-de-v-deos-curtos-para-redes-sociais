@@ -35,6 +35,7 @@ npm run prisma:migrate
 ```
 
 4. Garanta que o FFmpeg esteja instalado e acessivel via `ffmpeg`, ou ajuste `FFMPEG_PATH` no `.env`.
+   Se o `ffprobe` nao estiver no PATH, ajuste tambem `FFPROBE_PATH`.
 
 5. Rode o app:
 
@@ -158,10 +159,32 @@ Validacao:
 - Audios aceitos: MP3, WAV, M4A, AAC, OGG e WEBM.
 - Qualquer outro MIME type retorna erro `400`.
 
+## Geracao de video
+
+A geracao fica isolada em `src/features/video/video-service.ts`, na classe `VideoService`.
+
+Fluxo:
+
+1. Busca o `ContentProject` e seus `MediaFile`.
+2. Valida se ha pelo menos uma imagem e um audio.
+3. Usa `ffprobe` para calcular a duracao total do audio.
+4. Divide a duracao do audio igualmente entre as imagens.
+5. Usa FFmpeg para gerar um MP4 vertical `1080x1920`.
+6. Salva o video em `storage/generated/<projectId>.mp4`.
+7. Cria/atualiza `GeneratedVideo`.
+8. Atualiza `ContentProject.status` para `READY`.
+9. Em caso de erro, atualiza `ContentProject.status` para `ERROR`.
+
+Endpoint:
+
+- `POST /api/content-projects/[id]/generate`
+  - Gera o video final do projeto.
+  - Retorna caminho, duracao e resolucao do video gerado.
+
 ## Decisoes de arquitetura
 
 - `features/content` concentra o fluxo principal para evitar espalhar regra de negocio pelas paginas.
-- `lib/ffmpeg/video-generator.ts` isola a chamada ao FFmpeg. Esse modulo pode virar um worker/fila depois sem mudar as telas.
+- `features/video/video-service.ts` isola a chamada ao FFmpeg. Esse modulo pode virar um worker/fila depois sem mudar as telas.
 - `lib/storage/local-storage.ts` encapsula gravacao em disco. Uma futura migracao para S3/R2 deve preservar a mesma ideia de contrato.
 - `integrations/manus` e `integrations/social` existem apenas como interfaces/stubs. Nenhuma chamada externa real e feita no MVP.
 - O banco salva projetos, arquivos de midia, videos gerados, contas sociais e agendamentos futuros.
