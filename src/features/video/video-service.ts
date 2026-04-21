@@ -8,7 +8,7 @@ import { getGeneratedVideoPath } from "@/lib/storage/local-storage";
 type GenerateVerticalMp4Input = {
   images: string[];
   audio: string;
-  caption: string;
+  captionText: string;
   output: string;
   audioDuration: number;
 };
@@ -81,18 +81,66 @@ function escapeConcatPath(filePath: string) {
   return filePath.replace(/\\/g, "/").replace(/'/g, "'\\''");
 }
 
-function escapeDrawText(text: string) {
-  return text
-    .replace(/\\/g, "\\\\")
+function escapeFilterPath(filePath: string) {
+  return filePath
+    .replace(/\\/g, "/")
     .replace(/:/g, "\\:")
     .replace(/'/g, "\\'")
+    .replace(/,/g, "\\,")
     .replace(/\[/g, "\\[")
-    .replace(/\]/g, "\\]")
-    .replace(/\r?\n/g, " ");
+    .replace(/\]/g, "\\]");
+}
+
+function splitLongWord(word: string, maxLength: number) {
+  const chunks: string[] = [];
+
+  for (let index = 0; index < word.length; index += maxLength) {
+    chunks.push(word.slice(index, index + maxLength));
+  }
+
+  return chunks;
+}
+
+function wrapCaptionText(text: string, maxLineLength = 30, maxLines = 4) {
+  const words = text
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .flatMap((word) =>
+      word.length > maxLineLength ? splitLongWord(word, maxLineLength) : word,
+    )
+    .filter(Boolean);
+
+  const lines: string[] = [];
+
+  for (const word of words) {
+    const currentLine = lines.at(-1);
+
+    if (!currentLine) {
+      lines.push(word);
+      continue;
+    }
+
+    if (`${currentLine} ${word}`.length <= maxLineLength) {
+      lines[lines.length - 1] = `${currentLine} ${word}`;
+      continue;
+    }
+
+    lines.push(word);
+  }
+
+  if (lines.length <= maxLines) {
+    return lines.join("\n");
+  }
+
+  const visibleLines = lines.slice(0, maxLines);
+  visibleLines[maxLines - 1] = `${visibleLines[maxLines - 1].replace(/\.+$/, "")}...`;
+
+  return visibleLines.join("\n");
 }
 
 export class VideoService {
-  async generateProjectVideo(projectId: string) {
+  async generateProjectVideo(projectId: string, options?: { captionText?: string }) {
     const project = await prisma.contentProject.findUnique({
       where: { id: projectId },
       include: { mediaFiles: true },
@@ -139,7 +187,7 @@ export class VideoService {
       await this.generateVerticalMp4({
         images: imagePaths,
         audio: audioPath,
-        caption: project.caption || project.prompt,
+        captionText: options?.captionText ?? project.caption ?? project.prompt,
         output,
         audioDuration,
       });
@@ -230,13 +278,19 @@ export class VideoService {
 
       await fs.writeFile(concatFile, concatBody);
 
-      const caption = escapeDrawText(input.caption.trim());
+      const caption = wrapCaptionText(input.captionText);
+      const captionFile = caption ? path.join(tempDir, "caption.txt") : null;
+
+      if (captionFile) {
+        await fs.writeFile(captionFile, caption, "utf8");
+      }
+
       const videoFilter = [
         "scale=1080:1920:force_original_aspect_ratio=increase",
         "crop=1080:1920",
         "setsar=1",
-        caption
-          ? `drawtext=text='${caption}':x=(w-text_w)/2:y=h-360:fontsize=60:fontcolor=white:borderw=4:bordercolor=black@0.65:box=1:boxcolor=black@0.30:boxborderw=26`
+        captionFile
+          ? `drawtext=textfile='${escapeFilterPath(captionFile)}':x=(w-text_w)/2:y=h-text_h-260:fontsize=58:fontcolor=white:line_spacing=12:box=1:boxcolor=black@0.55:boxborderw=30`
           : null,
         "format=yuv420p",
       ]

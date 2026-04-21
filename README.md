@@ -170,16 +170,18 @@ Fluxo:
 3. Usa `ffprobe` para calcular a duracao total do audio.
 4. Divide a duracao do audio igualmente entre as imagens.
 5. Usa FFmpeg para gerar um MP4 vertical `1080x1920`.
-6. Salva o video em `storage/generated/<projectId>.mp4`.
-7. Cria/atualiza `GeneratedVideo`.
-8. Atualiza `ContentProject.status` para `READY`.
-9. Em caso de erro, atualiza `ContentProject.status` para `ERROR`.
+6. Embute a legenda com `drawtext` na parte inferior, com texto branco, fundo escuro semi-transparente, fonte grande e margem segura.
+7. Salva o video em `storage/generated/<projectId>.mp4`.
+8. Cria/atualiza `GeneratedVideo`.
+9. Atualiza `ContentProject.status` para `READY`.
+10. Em caso de erro, atualiza `ContentProject.status` para `ERROR`.
 
 Endpoint:
 
 - `POST /api/content-projects/[id]/generate`
   - Gera o video final do projeto.
   - Retorna caminho, duracao e resolucao do video gerado.
+  - Opcionalmente aceita JSON `{ "caption": "texto da legenda" }` para sobrescrever a legenda salva apenas nessa geracao.
 
 ## Decisoes de arquitetura
 
