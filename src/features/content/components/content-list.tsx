@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { toPublicFileUrl } from "@/lib/paths";
 import { StatusBadge } from "@/components/status-badge";
-import type { ContentWithAssets } from "@/features/content/types";
+import type { ContentProjectWithRelations } from "@/features/content/types";
 
-export function ContentList({ contents }: { contents: ContentWithAssets[] }) {
+export function ContentList({ contents }: { contents: ContentProjectWithRelations[] }) {
   if (contents.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-stone-300 bg-white p-10 text-center">
@@ -31,16 +31,16 @@ export function ContentList({ contents }: { contents: ContentWithAssets[] }) {
                 </Link>
                 <StatusBadge status={content.status} />
               </div>
-              <p className="mt-1 line-clamp-2 text-sm text-zinc-500">{content.caption}</p>
+              <p className="mt-1 line-clamp-2 text-sm text-zinc-500">{content.prompt}</p>
               <p className="mt-2 text-xs text-zinc-400">
-                {content.assets.filter((asset) => asset.type === "IMAGE").length} imagens · criado em{" "}
+                {content.mediaFiles.filter((asset) => asset.type === "IMAGE").length} imagens · criado em{" "}
                 {content.createdAt.toLocaleDateString("pt-BR")}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {content.videoPath ? (
+              {content.generatedVideos[0]?.path ? (
                 <a
-                  href={`${toPublicFileUrl(content.videoPath)}?download=1`}
+                  href={`${toPublicFileUrl(content.generatedVideos[0].path)}?download=1`}
                   className="rounded-md border border-stone-300 px-3 py-2 text-sm font-medium hover:bg-stone-100"
                 >
                   Baixar

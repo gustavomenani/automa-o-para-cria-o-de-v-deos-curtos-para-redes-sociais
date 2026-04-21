@@ -22,9 +22,10 @@ export default async function ReviewContentPage({
     notFound();
   }
 
-  const images = content.assets.filter((asset) => asset.type === "IMAGE");
-  const audio = content.assets.find((asset) => asset.type === "AUDIO");
-  const videoUrl = content.videoPath ? toPublicFileUrl(content.videoPath) : null;
+  const images = content.mediaFiles.filter((asset) => asset.type === "IMAGE");
+  const audio = content.mediaFiles.find((asset) => asset.type === "AUDIO");
+  const videoPath = content.generatedVideos.at(0)?.path;
+  const videoUrl = videoPath ? toPublicFileUrl(videoPath) : null;
 
   return (
     <AppShell>
@@ -45,7 +46,7 @@ export default async function ReviewContentPage({
                   <h1 className="text-2xl font-semibold tracking-tight">{content.title}</h1>
                   <StatusBadge status={content.status} />
                 </div>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">{content.caption}</p>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-600">{content.prompt}</p>
               </div>
               {videoUrl ? (
                 <a
@@ -103,7 +104,7 @@ export default async function ReviewContentPage({
                     <img
                       key={image.id}
                       src={toPublicFileUrl(image.path)}
-                      alt={image.fileName}
+                      alt={image.originalName}
                       className="aspect-square rounded-md object-cover"
                     />
                   ))}

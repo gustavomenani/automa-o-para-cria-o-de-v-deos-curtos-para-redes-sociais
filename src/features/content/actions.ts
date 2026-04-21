@@ -10,6 +10,9 @@ import { getGeneratedVideoPath, saveUploadedFile } from "@/lib/storage/local-sto
 const contentSchema = z.object({
   title: z.string().trim().min(2, "Informe um titulo."),
   caption: z.string().trim().min(1, "Informe uma legenda."),
+  contentType: z
+    .enum(["REELS", "STORY", "TIKTOK", "YOUTUBE_SHORTS"])
+    .default("REELS"),
 });
 
 function filesFromFormData(formData: FormData, field: string) {
@@ -22,6 +25,7 @@ export async function createContentAction(formData: FormData) {
   const parsed = contentSchema.safeParse({
     title: formData.get("title"),
     caption: formData.get("caption"),
+    contentType: formData.get("contentType") || "REELS",
   });
 
   if (!parsed.success) {
@@ -39,10 +43,11 @@ export async function createContentAction(formData: FormData) {
     throw new Error("Envie um arquivo de audio.");
   }
 
-  const content = await prisma.content.create({
+  const content = await prisma.contentProject.create({
     data: {
       title: parsed.data.title,
-      caption: parsed.data.caption,
+      prompt: parsed.data.caption,
+      contentType: parsed.data.contentType,
       status: "DRAFT",
     },
   });
@@ -54,20 +59,22 @@ export async function createContentAction(formData: FormData) {
     );
     const storedAudio = await saveUploadedFile(audio, namespace);
 
-    await prisma.asset.createMany({
+    await prisma.mediaFile.createMany({
       data: [
         ...storedImages.map((image) => ({
-          contentId: content.id,
+          projectId: content.id,
           type: "IMAGE" as const,
-          fileName: image.fileName,
+          originalName: image.fileName,
+          format: image.fileName.split(".").pop()?.toLowerCase() ?? "image",
           mimeType: image.mimeType,
           path: image.path,
           size: image.size,
         })),
         {
-          contentId: content.id,
+          projectId: content.id,
           type: "AUDIO" as const,
-          fileName: storedAudio.fileName,
+          originalName: storedAudio.fileName,
+          format: storedAudio.fileName.split(".").pop()?.toLowerCase() ?? "audio",
           mimeType: storedAudio.mimeType,
           path: storedAudio.path,
           size: storedAudio.size,
@@ -75,10 +82,10 @@ export async function createContentAction(formData: FormData) {
       ],
     });
   } catch (error) {
-    await prisma.content.update({
+    await prisma.contentProject.update({
       where: { id: content.id },
       data: {
-        status: "FAILED",
+        status: "ERROR",
         errorMessage: error instanceof Error ? error.message : "Falha ao salvar arquivos.",
       },
     });
@@ -91,19 +98,19 @@ export async function createContentAction(formData: FormData) {
 }
 
 export async function generateContentVideoAction(contentId: string) {
-  const content = await prisma.content.findUnique({
+  const content = await prisma.contentProject.findUnique({
     where: { id: contentId },
-    include: { assets: true },
+    include: { mediaFiles: true },
   });
 
   if (!content) {
     throw new Error("Conteudo nao encontrado.");
   }
 
-  const imagePaths = content.assets
+  const imagePaths = content.mediaFiles
     .filter((asset) => asset.type === "IMAGE")
     .map((asset) => asset.path);
-  const audioPath = content.assets.find((asset) => asset.type === "AUDIO")?.path;
+  const audioPath = content.mediaFiles.find((asset) => asset.type === "AUDIO")?.path;
 
   if (!audioPath || imagePaths.length === 0) {
     throw new Error("Conteudo precisa de imagens e audio antes da geracao.");
@@ -112,26 +119,41 @@ export async function generateContentVideoAction(contentId: string) {
   const output = await getGeneratedVideoPath(content.id);
 
   try {
+    await prisma.contentProject.update({
+      where: { id: content.id },
+      data: { status: "PROCESSING", errorMessage: null },
+    });
+
     await generateVerticalVideo({
       images: imagePaths,
       audio: audioPath,
-      caption: content.caption,
+      caption: content.prompt,
       output,
     });
 
-    await prisma.content.update({
-      where: { id: content.id },
-      data: {
-        status: "READY",
-        videoPath: output,
-        errorMessage: null,
-      },
-    });
+    await prisma.$transaction([
+      prisma.generatedVideo.create({
+        data: {
+          projectId: content.id,
+          path: output,
+          duration: null,
+          resolution: "1080x1920",
+          status: "READY",
+        },
+      }),
+      prisma.contentProject.update({
+        where: { id: content.id },
+        data: {
+          status: "READY",
+          errorMessage: null,
+        },
+      }),
+    ]);
   } catch (error) {
-    await prisma.content.update({
+    await prisma.contentProject.update({
       where: { id: content.id },
       data: {
-        status: "FAILED",
+        status: "ERROR",
         errorMessage: error instanceof Error ? error.message : "Falha ao gerar video.",
       },
     });

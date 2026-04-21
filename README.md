@@ -77,10 +77,35 @@ src/
     paths.ts
     prisma.ts
 prisma/
-  schema.prisma             # modelos Content e Asset
+  schema.prisma             # modelos User, ContentProject, MediaFile, GeneratedVideo, ScheduledPost e SocialAccount
 storage/
   uploads/                  # arquivos enviados no MVP
   generated/                # MP4s gerados no MVP
+```
+
+## Banco de dados
+
+O schema principal fica em `prisma/schema.prisma` e possui:
+
+- `User`: usuario dono de projetos e contas sociais.
+- `ContentProject`: projeto de conteudo com titulo, prompt, tipo, status e data de criacao.
+- `MediaFile`: arquivos usados no projeto, como imagem, audio, legenda e video.
+- `GeneratedVideo`: video final gerado, com caminho, duracao, resolucao e status.
+- `ScheduledPost`: agendamento futuro por plataforma.
+- `SocialAccount`: conta social conectavel futuramente.
+
+Para aplicar a migration apos subir o Docker:
+
+```bash
+docker compose up -d
+npm run prisma:generate
+npm run prisma:migrate
+```
+
+Se quiser inspecionar o banco:
+
+```bash
+npm run db:studio
 ```
 
 ## Decisoes de arquitetura
@@ -89,4 +114,4 @@ storage/
 - `lib/ffmpeg/video-generator.ts` isola a chamada ao FFmpeg. Esse modulo pode virar um worker/fila depois sem mudar as telas.
 - `lib/storage/local-storage.ts` encapsula gravacao em disco. Uma futura migracao para S3/R2 deve preservar a mesma ideia de contrato.
 - `integrations/manus` e `integrations/social` existem apenas como interfaces/stubs. Nenhuma chamada externa real e feita no MVP.
-- O banco salva metadados, status, legenda, caminhos dos assets e caminho do MP4 gerado.
+- O banco salva projetos, arquivos de midia, videos gerados, contas sociais e agendamentos futuros.

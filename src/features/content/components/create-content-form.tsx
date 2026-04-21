@@ -21,7 +21,7 @@ export function CreateContentForm() {
 
           <div>
             <label htmlFor="caption" className="text-sm font-medium text-zinc-800">
-              Legenda do video
+              Prompt e legenda do video
             </label>
             <textarea
               id="caption"
@@ -31,6 +31,23 @@ export function CreateContentForm() {
               placeholder="Texto que sera aplicado no video vertical."
               className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6"
             />
+          </div>
+
+          <div>
+            <label htmlFor="contentType" className="text-sm font-medium text-zinc-800">
+              Tipo de conteudo
+            </label>
+            <select
+              id="contentType"
+              name="contentType"
+              defaultValue="REELS"
+              className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm"
+            >
+              <option value="REELS">Reels</option>
+              <option value="STORY">Story</option>
+              <option value="TIKTOK">TikTok</option>
+              <option value="YOUTUBE_SHORTS">YouTube Shorts</option>
+            </select>
           </div>
         </section>
 

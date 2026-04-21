@@ -1,5 +1,6 @@
-import type { Asset, Content } from "@prisma/client";
+import type { ContentProject, GeneratedVideo, MediaFile } from "@prisma/client";
 
-export type ContentWithAssets = Content & {
-  assets: Asset[];
+export type ContentProjectWithRelations = ContentProject & {
+  mediaFiles: MediaFile[];
+  generatedVideos: GeneratedVideo[];
 };

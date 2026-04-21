@@ -7,46 +7,159 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum ContentStatus {
-  DRAFT
-  READY
-  FAILED
-  SCHEDULED
-  PUBLISHED
+enum ContentType {
+  REELS          @map("reels")
+  STORY          @map("story")
+  TIKTOK         @map("tiktok")
+  YOUTUBE_SHORTS @map("youtube_shorts")
+
+  @@map("content_type")
 }
 
-enum AssetType {
-  IMAGE
-  AUDIO
-  VIDEO
+enum ProjectStatus {
+  DRAFT      @map("draft")
+  PROCESSING @map("processing")
+  READY      @map("ready")
+  SCHEDULED  @map("scheduled")
+  PUBLISHED  @map("published")
+  ERROR      @map("error")
+
+  @@map("project_status")
 }
 
-model Content {
-  id           String        @id @default(cuid())
-  title        String
-  caption      String
-  status       ContentStatus @default(DRAFT)
-  videoPath    String?
-  errorMessage String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  assets       Asset[]
+enum MediaFileType {
+  IMAGE    @map("image")
+  AUDIO    @map("audio")
+  SUBTITLE @map("subtitle")
+  VIDEO    @map("video")
 
+  @@map("media_file_type")
+}
+
+enum GeneratedVideoStatus {
+  PROCESSING @map("processing")
+  READY      @map("ready")
+  ERROR      @map("error")
+
+  @@map("generated_video_status")
+}
+
+enum SocialPlatform {
+  INSTAGRAM      @map("instagram")
+  TIKTOK         @map("tiktok")
+  YOUTUBE        @map("youtube")
+  YOUTUBE_SHORTS @map("youtube_shorts")
+
+  @@map("social_platform")
+}
+
+enum ScheduledPostStatus {
+  SCHEDULED @map("scheduled")
+  PUBLISHED @map("published")
+  FAILED    @map("failed")
+  CANCELED  @map("canceled")
+
+  @@map("scheduled_post_status")
+}
+
+model User {
+  id             String           @id @default(cuid())
+  name           String?
+  email          String           @unique
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  projects       ContentProject[]
+  socialAccounts SocialAccount[]
+
+  @@map("users")
+}
+
+model ContentProject {
+  id              String           @id @default(cuid())
+  userId          String?
+  title           String
+  prompt          String
+  contentType     ContentType
+  status          ProjectStatus    @default(DRAFT)
+  errorMessage    String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  mediaFiles      MediaFile[]
+  generatedVideos GeneratedVideo[]
+  scheduledPosts  ScheduledPost[]
+
+  @@index([userId])
+  @@index([contentType])
   @@index([status])
   @@index([createdAt])
+  @@map("content_projects")
 }
 
-model Asset {
-  id        String    @id @default(cuid())
-  contentId String
-  type      AssetType
-  fileName  String
-  mimeType  String
-  path      String
-  size      Int
-  createdAt DateTime  @default(now())
-  content   Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+model MediaFile {
+  id           String         @id @default(cuid())
+  projectId    String
+  type         MediaFileType
+  path         String
+  originalName String
+  size         Int
+  format       String
+  mimeType     String?
+  createdAt    DateTime       @default(now())
+  project      ContentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([contentId])
+  @@index([projectId])
   @@index([type])
+  @@map("media_files")
+}
+
+model GeneratedVideo {
+  id         String               @id @default(cuid())
+  projectId  String
+  path       String
+  duration   Int?
+  resolution String
+  status     GeneratedVideoStatus @default(PROCESSING)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  project    ContentProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+  @@map("generated_videos")
+}
+
+model ScheduledPost {
+  id          String              @id @default(cuid())
+  projectId   String
+  platform    SocialPlatform
+  scheduledAt DateTime
+  status      ScheduledPostStatus @default(SCHEDULED)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  project     ContentProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([platform])
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("scheduled_posts")
+}
+
+model SocialAccount {
+  id             String         @id @default(cuid())
+  userId         String
+  platform       SocialPlatform
+  accountName    String
+  externalId     String?
+  accessTokenRef String?
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, accountName])
+  @@index([userId])
+  @@index([platform])
+  @@map("social_accounts")
 }
