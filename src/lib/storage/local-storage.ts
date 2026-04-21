@@ -25,7 +25,8 @@ export async function saveUploadedFile(file: File, namespace: string): Promise<S
   const folder = path.join(uploadRoot, namespace);
   await fs.mkdir(folder, { recursive: true });
 
-  const cleanName = sanitizeFileName(file.name || "upload.bin");
+  const originalName = file.name || "upload.bin";
+  const cleanName = sanitizeFileName(originalName);
   const fileName = `${randomUUID()}-${cleanName}`;
   const destination = path.join(folder, fileName);
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -33,7 +34,7 @@ export async function saveUploadedFile(file: File, namespace: string): Promise<S
   await fs.writeFile(destination, bytes);
 
   return {
-    fileName: cleanName,
+    fileName: originalName,
     mimeType: file.type || "application/octet-stream",
     path: destination,
     size: bytes.length,

@@ -117,6 +117,47 @@ Se quiser inspecionar o banco:
 npm run db:studio
 ```
 
+## Upload de arquivos
+
+Os uploads ficam no storage local do MVP:
+
+```txt
+storage/
+  uploads/
+    <contentProjectId>/
+      <uuid>-<nome-sanitizado>
+  generated/
+    <contentProjectId>.mp4
+```
+
+Cada upload tambem gera um registro em `media_files`, vinculado ao `ContentProject` por `projectId`.
+
+Endpoints:
+
+- `POST /api/content-projects`
+  - Cria um `ContentProject`.
+  - Salva multiplas imagens e um audio em `storage/uploads/<projectId>/`.
+  - Cria os registros `MediaFile` no banco.
+  - Espera `multipart/form-data` com:
+    - `title`
+    - `prompt`
+    - `caption` opcional
+    - `contentType`: `REELS`, `STORY`, `TIKTOK` ou `YOUTUBE_SHORTS`
+    - `images`: um ou mais arquivos
+    - `audio`: um arquivo
+
+- `POST /api/content-projects/[id]/media`
+  - Anexa novas midias a um projeto existente.
+  - Espera `multipart/form-data` com:
+    - `images`: zero ou mais arquivos
+    - `audio`: zero ou um arquivo
+
+Validacao:
+
+- Imagens aceitas: JPG, PNG e WEBP.
+- Audios aceitos: MP3, WAV, M4A, AAC, OGG e WEBM.
+- Qualquer outro MIME type retorna erro `400`.
+
 ## Decisoes de arquitetura
 
 - `features/content` concentra o fluxo principal para evitar espalhar regra de negocio pelas paginas.
