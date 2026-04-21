@@ -10,6 +10,13 @@ Phase 1: Stabilize Core MVP.
 
 The project is not at zero. It already has a working local MVP shell and most of the prompt/upload/video/review/schedule flow. The current active blocker is subtitle quality: preserving Whisper timing while correcting transcription text against the original script/caption without introducing delay or awkward formatting.
 
+## Planning Status
+
+- **Phase 1**: Planned and verified.
+- **Plan count**: 3 plans in 3 waves.
+- **Plan directory**: `.planning/phases/01-stabilize-core-mvp/`
+- **Verification**: Plan checker passed after one targeted revision.
+
 ## Current Codebase Map
 
 See `.planning/codebase/`:
@@ -73,7 +80,7 @@ Do not revert them blindly; they are part of the ongoing subtitle work.
 
 ## Next Recommended Command
 
-Use `$gsd-plan-phase 1` to create an executable plan for the immediate stabilization phase.
+Use `$gsd-execute-phase 1` to execute the immediate stabilization phase.
 
 ---
-*State initialized: 2026-04-21 from scope PDF and codebase map*
+*Last updated: 2026-04-21 after Phase 1 planning*
