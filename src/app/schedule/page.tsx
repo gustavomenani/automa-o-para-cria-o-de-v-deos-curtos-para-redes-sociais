@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarClock, ExternalLink, PlusCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { FeedbackBanner } from "@/components/feedback-banner";
+import { DeleteContentButton } from "@/features/content/components/delete-content-button";
 import { getScheduledPosts } from "@/features/schedule/queries";
 import { formatDateTime } from "@/lib/formatters";
 import { toPublicFileUrl } from "@/lib/paths";
@@ -22,10 +23,18 @@ const statusLabels = {
   CANCELED: "Cancelado",
 };
 
+const statusBadgeClasses = {
+  SCHEDULED: "bg-emerald-100 text-emerald-800",
+  READY_TO_POST: "bg-amber-100 text-amber-800",
+  PUBLISHED: "bg-sky-100 text-sky-800",
+  FAILED: "bg-red-100 text-red-800",
+  CANCELED: "bg-zinc-200 text-zinc-700",
+};
+
 export default async function SchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ scheduled?: string }>;
+  searchParams: Promise<{ deleted?: string; scheduled?: string }>;
 }) {
   const feedback = await searchParams;
   const scheduledPosts = await getScheduledPosts();
@@ -60,6 +69,14 @@ export default async function SchedulePage({
           />
         ) : null}
 
+        {feedback.deleted ? (
+          <FeedbackBanner
+            type="success"
+            title="Conteudo excluido"
+            message="O conteudo relacionado ao agendamento foi removido com seus arquivos e registros."
+          />
+        ) : null}
+
         {scheduledPosts.length === 0 ? (
           <section className="rounded-lg border border-dashed border-stone-300 bg-white p-10 text-center">
             <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-stone-100 text-teal-700">
@@ -76,6 +93,15 @@ export default async function SchedulePage({
               {scheduledPosts.map((post) => {
                 const videoPath = post.project.generatedVideos[0]?.path;
                 const scheduled = formatDateTime(post.scheduledAt);
+                const isReadyToPost = new Date(post.scheduledAt) <= new Date();
+                const visualStatus =
+                  post.status === "SCHEDULED" && isReadyToPost
+                    ? "READY_TO_POST"
+                    : post.status;
+                const statusLabel =
+                  visualStatus === "READY_TO_POST"
+                    ? "Pronto para postar"
+                    : statusLabels[visualStatus];
 
                 return (
                   <article
@@ -100,8 +126,10 @@ export default async function SchedulePage({
                         <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
                           {platformLabels[post.platform]}
                         </span>
-                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
-                          {statusLabels[post.status]}
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClasses[visualStatus]}`}
+                        >
+                          {statusLabel}
                         </span>
                       </div>
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-600">
@@ -125,6 +153,11 @@ export default async function SchedulePage({
                         Abrir
                         <ExternalLink size={14} />
                       </Link>
+                      <DeleteContentButton
+                        contentId={post.projectId}
+                        compact
+                        redirectTarget="schedule"
+                      />
                     </div>
                   </article>
                 );

@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { FeedbackBanner } from "@/components/feedback-banner";
 import { ContentList } from "@/features/content/components/content-list";
 import { getContents } from "@/features/content/queries";
 
 export const dynamic = "force-dynamic";
 
-export default async function ContentsPage() {
+export default async function ContentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string }>;
+}) {
+  const feedback = await searchParams;
   const contents = await getContents();
 
   return (
@@ -28,7 +34,15 @@ export default async function ContentsPage() {
           </Link>
         </div>
 
-        <ContentList contents={contents} />
+        {feedback.deleted ? (
+          <FeedbackBanner
+            type="success"
+            title="Conteudo excluido"
+            message="O projeto, seus arquivos locais, videos gerados e agendamentos relacionados foram removidos."
+          />
+        ) : null}
+
+        <ContentList contents={contents} showDelete />
       </div>
     </AppShell>
   );

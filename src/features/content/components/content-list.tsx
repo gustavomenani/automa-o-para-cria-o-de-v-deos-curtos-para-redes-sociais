@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { toPublicFileUrl } from "@/lib/paths";
 import { StatusBadge } from "@/components/status-badge";
+import { DeleteContentButton } from "@/features/content/components/delete-content-button";
 import type { ContentProjectWithRelations } from "@/features/content/types";
 
-export function ContentList({ contents }: { contents: ContentProjectWithRelations[] }) {
+type ContentListProps = {
+  contents: ContentProjectWithRelations[];
+  showDelete?: boolean;
+};
+
+export function ContentList({ contents, showDelete = false }: ContentListProps) {
   if (contents.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-stone-300 bg-white p-10 text-center">
@@ -52,6 +58,7 @@ export function ContentList({ contents }: { contents: ContentProjectWithRelation
               >
                 Revisar
               </Link>
+              {showDelete ? <DeleteContentButton contentId={content.id} compact /> : null}
             </div>
           </div>
         ))}

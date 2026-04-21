@@ -1,6 +1,10 @@
 import type { ContentProject, MediaFile } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { saveUploadedFile, type StoredFile } from "@/lib/storage/local-storage";
+import {
+  deleteProjectStorage,
+  saveUploadedFile,
+  type StoredFile,
+} from "@/lib/storage/local-storage";
 import {
   contentProjectInputSchema,
   type ContentProjectInput,
@@ -145,6 +149,8 @@ export async function createProjectWithUploads(input: ContentProjectInput, files
       },
     });
   } catch (error) {
+    await deleteProjectStorage(project.id);
+
     await prisma.contentProject.update({
       where: { id: project.id },
       data: {
