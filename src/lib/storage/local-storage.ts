@@ -41,6 +41,31 @@ export async function saveUploadedFile(file: File, namespace: string): Promise<S
   };
 }
 
+export async function saveGeneratedAsset(
+  bytes: Buffer,
+  namespace: string,
+  fileName: string,
+  mimeType: string,
+): Promise<StoredFile> {
+  await ensureStorageFolders();
+
+  const folder = path.join(uploadRoot, namespace);
+  await fs.mkdir(folder, { recursive: true });
+
+  const cleanName = sanitizeFileName(fileName || "generated-asset.bin");
+  const storedName = `${randomUUID()}-${cleanName}`;
+  const destination = path.join(folder, storedName);
+
+  await fs.writeFile(destination, bytes);
+
+  return {
+    fileName: cleanName,
+    mimeType,
+    path: destination,
+    size: bytes.length,
+  };
+}
+
 export async function getGeneratedVideoPath(contentId: string) {
   await ensureStorageFolders();
   return path.join(generatedRoot, `${contentId}.mp4`);

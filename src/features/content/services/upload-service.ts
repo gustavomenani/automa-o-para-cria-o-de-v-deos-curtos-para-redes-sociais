@@ -124,11 +124,10 @@ export async function attachMediaFilesToProject(projectId: string, files: Projec
   });
 }
 
-export async function createProjectWithUploads(input: ContentProjectInput, files: ProjectFilesInput) {
+export async function createContentProject(input: ContentProjectInput) {
   const parsed = contentProjectInputSchema.parse(input);
-  validateProjectFiles(files);
 
-  const project = await prisma.contentProject.create({
+  return prisma.contentProject.create({
     data: {
       title: parsed.title,
       prompt: parsed.prompt,
@@ -137,6 +136,13 @@ export async function createProjectWithUploads(input: ContentProjectInput, files
       status: "DRAFT",
     },
   });
+}
+
+export async function createProjectWithUploads(input: ContentProjectInput, files: ProjectFilesInput) {
+  const parsed = contentProjectInputSchema.parse(input);
+  validateProjectFiles(files);
+
+  const project = await createContentProject(parsed);
 
   try {
     await attachMediaFilesToProject(project.id, files);

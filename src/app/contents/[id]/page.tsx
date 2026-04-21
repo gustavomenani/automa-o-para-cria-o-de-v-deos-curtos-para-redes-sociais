@@ -17,6 +17,7 @@ import { GenerateVideoButton } from "@/features/content/components/generate-vide
 import { generateContentVideoAction } from "@/features/content/actions";
 import { getContentById } from "@/features/content/queries";
 import { schedulePostAction } from "@/features/schedule/actions";
+import { readStoredGeminiPlan } from "@/integrations/gemini/gemini-service";
 import { formatContentType, formatFileSize } from "@/lib/formatters";
 import { toPublicFileUrl } from "@/lib/paths";
 
@@ -35,7 +36,14 @@ export default async function ContentDetailsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ created?: string; generated?: string }>;
+  searchParams: Promise<{
+    created?: string;
+    generated?: string;
+    gemini?: string;
+    geminiError?: string;
+    error?: string;
+    videoWarning?: string;
+  }>;
 }) {
   const { id } = await params;
   const feedback = await searchParams;
@@ -51,6 +59,7 @@ export default async function ContentDetailsPage({
   const videoPath = generatedVideo?.path;
   const videoUrl = videoPath ? toPublicFileUrl(videoPath) : null;
   const today = getLocalDateInputValue(new Date());
+  const geminiPlan = await readStoredGeminiPlan(content.id);
 
   return (
     <AppShell>
@@ -76,6 +85,38 @@ export default async function ContentDetailsPage({
             type="success"
             title="Video gerado"
             message="O MP4 vertical foi salvo e ja pode ser revisado ou baixado."
+          />
+        ) : null}
+
+        {feedback.gemini ? (
+          <FeedbackBanner
+            type="success"
+            title="Assets gerados com Gemini"
+            message="O roteiro e a legenda retornados pela API foram salvos. Imagens e audio tambem aparecem quando o modelo permite gerar esses arquivos."
+          />
+        ) : null}
+
+        {feedback.geminiError ? (
+          <FeedbackBanner
+            type="error"
+            title="Gemini nao gerou os assets"
+            message={decodeURIComponent(feedback.geminiError)}
+          />
+        ) : null}
+
+        {feedback.error ? (
+          <FeedbackBanner
+            type="error"
+            title="Nao foi possivel concluir a acao"
+            message={decodeURIComponent(feedback.error)}
+          />
+        ) : null}
+
+        {feedback.videoWarning ? (
+          <FeedbackBanner
+            type="info"
+            title="Assets salvos, video pendente"
+            message={decodeURIComponent(feedback.videoWarning)}
           />
         ) : null}
 
@@ -189,6 +230,51 @@ export default async function ContentDetailsPage({
                   <dd className="mt-1 font-medium">{generatedVideo.resolution}</dd>
                 </div>
               </dl>
+            ) : null}
+
+            {geminiPlan ? (
+              <div className="mt-5 space-y-4 border-t border-stone-200 pt-5">
+                <div>
+                  <h2 className="text-sm font-semibold">Resultados Gemini</h2>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">
+                    {geminiPlan.reelsScript}
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-md bg-stone-50 p-4">
+                    <h3 className="text-sm font-semibold">Caption da postagem</h3>
+                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-600">
+                      {geminiPlan.postCaption}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-stone-50 p-4">
+                    <h3 className="text-sm font-semibold">Hashtags</h3>
+                    <p className="mt-2 text-sm leading-6 text-zinc-600">
+                      {geminiPlan.hashtags.join(" ")}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <h3 className="text-sm font-semibold">Ideias de cenas</h3>
+                    <ul className="mt-2 space-y-2 text-sm leading-6 text-zinc-600">
+                      {geminiPlan.sceneIdeas.map((idea) => (
+                        <li key={idea}>{idea}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Prompts de imagem</h3>
+                    <ul className="mt-2 space-y-2 text-sm leading-6 text-zinc-600">
+                      {geminiPlan.imagePrompts.map((prompt) => (
+                        <li key={prompt}>{prompt}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
             ) : null}
           </section>
 

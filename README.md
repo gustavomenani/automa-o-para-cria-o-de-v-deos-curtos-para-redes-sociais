@@ -39,7 +39,34 @@ npm run prisma:deploy
 4. Garanta que o FFmpeg esteja instalado e acessivel via `ffmpeg`, ou ajuste `FFMPEG_PATH` no `.env`.
    Se o `ffprobe` nao estiver no PATH, ajuste tambem `FFPROBE_PATH`.
 
-5. Rode o app:
+5. Para testar a Gemini, preencha no `.env`:
+
+```env
+GEMINI_API_KEY="sua-chave-da-gemini"
+```
+
+Sem essa variavel, o app continua funcionando no fluxo manual e mostra um erro amigavel ao clicar em `Gerar assets com Gemini`.
+
+6. Para legendas com timestamps reais, instale o Whisper local:
+
+```bash
+python -m pip install -r requirements-whisper.txt
+```
+
+Variaveis opcionais:
+
+```env
+WHISPER_PYTHON_PATH="python"
+WHISPER_MODEL="base"
+WHISPER_LANGUAGE="pt"
+WHISPER_DEVICE="cpu"
+WHISPER_COMPUTE_TYPE="int8"
+WHISPER_TIMEOUT_MS="240000"
+```
+
+Se o Whisper local nao estiver instalado, o app continua gerando videos com sincronizacao aproximada baseada na duracao do audio.
+
+7. Rode o app:
 
 ```bash
 npm run dev
@@ -88,6 +115,7 @@ src/
     video/
       services/             # VideoService com FFmpeg/ffprobe
   integrations/
+    gemini/                 # integracao real de teste com Google Gemini
     manus/                  # stub para integracao futura
     social/                 # stub para publicacao/agendamento futuro
   lib/
@@ -180,11 +208,13 @@ Fluxo:
 3. Usa `ffprobe` para calcular a duracao total do audio.
 4. Divide a duracao do audio igualmente entre as imagens.
 5. Usa FFmpeg para gerar um MP4 vertical `1080x1920`.
-6. Embute a legenda com `drawtext` na parte inferior, com texto branco, fundo escuro semi-transparente, fonte grande e margem segura.
-7. Salva o video em `storage/generated/<projectId>.mp4`.
-8. Cria/atualiza `GeneratedVideo`.
-9. Atualiza `ContentProject.status` para `READY`.
-10. Em caso de erro, atualiza `ContentProject.status` para `ERROR`.
+6. Tenta transcrever o audio com Whisper local para obter timestamps reais.
+7. Gera uma legenda `.ass` premium com texto branco, contorno preto, sem fundo e margem segura.
+8. Se o Whisper nao estiver disponivel, usa fallback proporcional pela duracao do audio.
+9. Salva o video em `storage/generated/<projectId>.mp4`.
+10. Cria/atualiza `GeneratedVideo`.
+11. Atualiza `ContentProject.status` para `READY`.
+12. Em caso de erro, atualiza `ContentProject.status` para `ERROR`.
 
 Endpoint:
 
@@ -192,6 +222,27 @@ Endpoint:
   - Gera o video final do projeto.
   - Retorna caminho, duracao e resolucao do video gerado.
   - Opcionalmente aceita JSON `{ "caption": "texto da legenda" }` para sobrescrever a legenda salva apenas nessa geracao.
+
+## Gemini
+
+A integracao de teste com Google Gemini fica em `src/integrations/gemini/gemini-service.ts`.
+
+O service le a chave apenas do servidor, por `process.env.GEMINI_API_KEY`, e expõe:
+
+- `generateReelsPlan(prompt)`: envia o prompt para `gemini-2.5-flash` e retorna roteiro, legenda, caption, hashtags, ideias de cenas e prompts de imagem.
+- `generateSceneImages(imagePrompts)`: tenta gerar imagens verticais 9:16 com `gemini-2.5-flash-image`.
+- `generateNarrationAudio(script)`: tenta gerar narracao em portugues brasileiro com `gemini-2.5-flash-preview-tts`.
+- `generateTestAssetsForProject(projectId, prompt)`: salva imagens/audio em `storage/uploads/<projectId>/`, registra `MediaFile` no banco e atualiza titulo/legenda do projeto.
+
+Na tela `/contents/[id]`, o botao `Gerar assets com Gemini` dispara esse fluxo. Se o modelo de imagem ou audio nao estiver disponivel para a chave usada, o sistema mantem o plano textual gerado e permite continuar com upload manual.
+
+Se a Gemini nao retornar imagens, o app tenta usar a Manus como fallback, criando uma task assíncrona via API e baixando anexos de imagem retornados em `task.listMessages`. Para habilitar:
+
+```env
+MANUS_API_KEY="sua-chave-da-manus"
+```
+
+Tambem e possivel cadastrar a chave em `/settings`. A chave da Manus nunca deve ser colocada no codigo.
 
 ## Agendamento
 
@@ -258,6 +309,16 @@ FFPROBE_PATH="C:/ffmpeg/bin/ffprobe.exe"
 ```
 
 Depois acesse `http://localhost:3000/dashboard`.
+
+Para validar a Gemini:
+
+1. Adicione `GEMINI_API_KEY` no `.env`.
+2. Reinicie `npm run dev`.
+3. Crie um projeto com prompt em `/contents/new`.
+4. Abra `/contents/[id]` e clique em `Gerar assets com Gemini`.
+5. Confira o roteiro, captions, hashtags, prompts e arquivos salvos na tela de revisao.
+
+Para validar o fallback sem chave, remova `GEMINI_API_KEY` do `.env`, reinicie o servidor e clique no mesmo botao. A tela deve mostrar a mensagem `GEMINI_API_KEY não configurada. Adicione a chave no arquivo .env.` e o fluxo manual continua disponivel.
 
 Fluxo manual para validar:
 
