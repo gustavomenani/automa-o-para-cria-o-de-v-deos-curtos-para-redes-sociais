@@ -135,6 +135,7 @@ model ScheduledPost {
   projectId   String
   platform    SocialPlatform
   scheduledAt DateTime
+  caption     String
   status      ScheduledPostStatus @default(SCHEDULED)
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt

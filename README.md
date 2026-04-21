@@ -59,8 +59,8 @@ npm run dev
 - `/dashboard`: visao geral e projetos recentes.
 - `/contents`: lista de projetos de conteudo.
 - `/contents/new`: criacao de projeto com prompt, legenda, imagens e audio.
-- `/contents/[id]`: revisao do projeto, geracao do MP4 e download.
-- `/schedule`: base visual para agendamentos futuros.
+- `/contents/[id]`: revisao do projeto, geracao do MP4, download e agendamento basico.
+- `/schedule`: lista de postagens agendadas salvas no banco.
 - `/settings`: base visual para configuracoes e integracoes futuras.
 
 ## Arquitetura de pastas
@@ -182,6 +182,19 @@ Endpoint:
   - Gera o video final do projeto.
   - Retorna caminho, duracao e resolucao do video gerado.
   - Opcionalmente aceita JSON `{ "caption": "texto da legenda" }` para sobrescrever a legenda salva apenas nessa geracao.
+
+## Agendamento
+
+O MVP salva agendamentos em `scheduled_posts`, sem publicar automaticamente.
+
+Na tela `/contents/[id]`, depois que houver video gerado, o usuario pode escolher:
+
+- plataforma: Instagram, TikTok ou YouTube
+- data
+- horario
+- caption da postagem
+
+Ao salvar, o sistema cria um `ScheduledPost`, atualiza o projeto para `SCHEDULED` e mostra o item em `/schedule`.
 
 ## Decisoes de arquitetura
 

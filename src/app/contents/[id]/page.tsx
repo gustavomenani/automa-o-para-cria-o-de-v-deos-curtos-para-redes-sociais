@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { GenerateVideoButton } from "@/features/content/components/generate-video-button";
 import { generateContentVideoAction } from "@/features/content/actions";
 import { getContentById } from "@/features/content/queries";
+import { schedulePostAction } from "@/features/schedule/actions";
 import { toPublicFileUrl } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,7 @@ export default async function ContentDetailsPage({
   const generatedVideo = content.generatedVideos.at(0);
   const videoPath = generatedVideo?.path;
   const videoUrl = videoPath ? toPublicFileUrl(videoPath) : null;
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <AppShell>
@@ -87,7 +89,7 @@ export default async function ContentDetailsPage({
                 </a>
               ) : null}
               <Link
-                href="/schedule"
+                href="#schedule-post"
                 aria-disabled={!videoUrl}
                 className={`inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold ${
                   videoUrl
@@ -171,6 +173,96 @@ export default async function ContentDetailsPage({
           </section>
 
           <aside className="space-y-5">
+            <section
+              id="schedule-post"
+              className="rounded-lg border border-stone-200 bg-white p-5"
+            >
+              <h2 className="font-semibold">Agendar postagem</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">
+                Salve plataforma, data, horario e caption. Nenhuma rede social sera acionada ainda.
+              </p>
+              <form action={schedulePostAction} className="mt-4 space-y-4">
+                <input type="hidden" name="projectId" value={content.id} />
+
+                <div>
+                  <label htmlFor="platform" className="text-sm font-medium text-zinc-800">
+                    Plataforma
+                  </label>
+                  <select
+                    id="platform"
+                    name="platform"
+                    disabled={!videoUrl}
+                    defaultValue="INSTAGRAM"
+                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                  >
+                    <option value="INSTAGRAM">Instagram</option>
+                    <option value="TIKTOK">TikTok</option>
+                    <option value="YOUTUBE">YouTube</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  <div>
+                    <label htmlFor="date" className="text-sm font-medium text-zinc-800">
+                      Data
+                    </label>
+                    <input
+                      id="date"
+                      name="date"
+                      type="date"
+                      min={today}
+                      required
+                      disabled={!videoUrl}
+                      className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="time" className="text-sm font-medium text-zinc-800">
+                      Horario
+                    </label>
+                    <input
+                      id="time"
+                      name="time"
+                      type="time"
+                      required
+                      disabled={!videoUrl}
+                      className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="post-caption" className="text-sm font-medium text-zinc-800">
+                    Caption da postagem
+                  </label>
+                  <textarea
+                    id="post-caption"
+                    name="caption"
+                    rows={4}
+                    required
+                    disabled={!videoUrl}
+                    defaultValue={content.caption || ""}
+                    placeholder="Texto da postagem nas redes sociais."
+                    className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6 disabled:bg-stone-100 disabled:text-zinc-400"
+                  />
+                </div>
+
+                <button
+                  disabled={!videoUrl}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-500"
+                >
+                  <CalendarClock size={16} />
+                  Salvar agendamento
+                </button>
+              </form>
+
+              {!videoUrl ? (
+                <p className="mt-3 text-xs leading-5 text-zinc-500">
+                  Gere o video antes de salvar um agendamento.
+                </p>
+              ) : null}
+            </section>
+
             <section className="rounded-lg border border-stone-200 bg-white p-5">
               <h2 className="font-semibold">Midias enviadas</h2>
               <div className="mt-4 space-y-3">
