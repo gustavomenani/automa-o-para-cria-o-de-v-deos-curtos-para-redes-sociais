@@ -9,7 +9,8 @@ import { getGeneratedVideoPath, saveUploadedFile } from "@/lib/storage/local-sto
 
 const contentSchema = z.object({
   title: z.string().trim().min(2, "Informe um titulo."),
-  caption: z.string().trim().min(1, "Informe uma legenda."),
+  prompt: z.string().trim().min(1, "Informe um prompt."),
+  caption: z.string().trim().optional(),
   contentType: z
     .enum(["REELS", "STORY", "TIKTOK", "YOUTUBE_SHORTS"])
     .default("REELS"),
@@ -24,6 +25,7 @@ function filesFromFormData(formData: FormData, field: string) {
 export async function createContentAction(formData: FormData) {
   const parsed = contentSchema.safeParse({
     title: formData.get("title"),
+    prompt: formData.get("prompt"),
     caption: formData.get("caption"),
     contentType: formData.get("contentType") || "REELS",
   });
@@ -46,7 +48,8 @@ export async function createContentAction(formData: FormData) {
   const content = await prisma.contentProject.create({
     data: {
       title: parsed.data.title,
-      prompt: parsed.data.caption,
+      prompt: parsed.data.prompt,
+      caption: parsed.data.caption || null,
       contentType: parsed.data.contentType,
       status: "DRAFT",
     },
@@ -92,12 +95,17 @@ export async function createContentAction(formData: FormData) {
     throw error;
   }
 
+  if (formData.get("intent") === "generate") {
+    await generateProjectVideo(content.id);
+  }
+
   revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/contents");
-  redirect(`/contents/${content.id}/review`);
+  redirect(`/contents/${content.id}`);
 }
 
-export async function generateContentVideoAction(contentId: string) {
+async function generateProjectVideo(contentId: string) {
   const content = await prisma.contentProject.findUnique({
     where: { id: contentId },
     include: { mediaFiles: true },
@@ -127,7 +135,7 @@ export async function generateContentVideoAction(contentId: string) {
     await generateVerticalVideo({
       images: imagePaths,
       audio: audioPath,
-      caption: content.prompt,
+      caption: content.caption || content.prompt,
       output,
     });
 
@@ -160,7 +168,13 @@ export async function generateContentVideoAction(contentId: string) {
     throw error;
   }
 
+}
+
+export async function generateContentVideoAction(contentId: string) {
+  await generateProjectVideo(contentId);
+
   revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/contents");
-  revalidatePath(`/contents/${content.id}/review`);
+  revalidatePath(`/contents/${contentId}`);
 }

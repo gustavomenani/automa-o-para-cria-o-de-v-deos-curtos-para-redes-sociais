@@ -79,6 +79,7 @@ model ContentProject {
   userId          String?
   title           String
   prompt          String
+  caption         String?
   contentType     ContentType
   status          ProjectStatus    @default(DRAFT)
   errorMessage    String?

@@ -1,17 +1,26 @@
 import Link from "next/link";
-import { Clapperboard, History, LayoutDashboard, PlusCircle } from "lucide-react";
+import {
+  CalendarClock,
+  Clapperboard,
+  History,
+  LayoutDashboard,
+  PlusCircle,
+  Settings,
+} from "lucide-react";
 
 const navItems = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/contents", label: "Conteudos", icon: History },
   { href: "/contents/new", label: "Novo conteudo", icon: PlusCircle },
-  { href: "/contents", label: "Historico", icon: History },
+  { href: "/schedule", label: "Agenda", icon: CalendarClock },
+  { href: "/settings", label: "Configuracoes", icon: Settings },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-stone-50">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-stone-200 bg-white px-5 py-6 lg:block">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/dashboard" className="flex items-center gap-3">
           <span className="flex size-10 items-center justify-center rounded-lg bg-teal-700 text-white">
             <Clapperboard size={20} />
           </span>
@@ -43,7 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
         <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
+          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
             <Clapperboard size={20} className="text-teal-700" />
             Short Videos
           </Link>

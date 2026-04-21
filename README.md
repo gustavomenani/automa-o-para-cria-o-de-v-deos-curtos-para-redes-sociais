@@ -53,6 +53,15 @@ npm run dev
 7. Baixar video
 8. Consultar historico
 
+## Rotas principais
+
+- `/dashboard`: visao geral e projetos recentes.
+- `/contents`: lista de projetos de conteudo.
+- `/contents/new`: criacao de projeto com prompt, legenda, imagens e audio.
+- `/contents/[id]`: revisao do projeto, geracao do MP4 e download.
+- `/schedule`: base visual para agendamentos futuros.
+- `/settings`: base visual para configuracoes e integracoes futuras.
+
 ## Arquitetura de pastas
 
 ```txt

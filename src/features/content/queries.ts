@@ -1,12 +1,16 @@
 import { prisma } from "@/lib/prisma";
 
 export async function getDashboardStats() {
-  const [total, ready, failed, latest] = await Promise.all([
+  const [total, ready, failed, draft, latest] = await Promise.all([
     prisma.contentProject.count(),
     prisma.contentProject.count({ where: { status: "READY" } }),
     prisma.contentProject.count({ where: { status: "ERROR" } }),
+    prisma.contentProject.count({ where: { status: "DRAFT" } }),
     prisma.contentProject.findMany({
-      include: { mediaFiles: true, generatedVideos: true },
+      include: {
+        mediaFiles: true,
+        generatedVideos: { orderBy: { createdAt: "desc" } },
+      },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
@@ -16,14 +20,17 @@ export async function getDashboardStats() {
     total,
     ready,
     failed,
-    draft: total - ready - failed,
+    draft,
     latest,
   };
 }
 
 export async function getContents() {
   return prisma.contentProject.findMany({
-    include: { mediaFiles: true, generatedVideos: true },
+    include: {
+      mediaFiles: true,
+      generatedVideos: { orderBy: { createdAt: "desc" } },
+    },
     orderBy: { createdAt: "desc" },
   });
 }
@@ -31,6 +38,9 @@ export async function getContents() {
 export async function getContentById(id: string) {
   return prisma.contentProject.findUnique({
     where: { id },
-    include: { mediaFiles: true, generatedVideos: true },
+    include: {
+      mediaFiles: true,
+      generatedVideos: { orderBy: { createdAt: "desc" } },
+    },
   });
 }

@@ -24,7 +24,7 @@ export function ContentList({ contents }: { contents: ContentProjectWithRelation
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <Link
-                  href={`/contents/${content.id}/review`}
+                  href={`/contents/${content.id}`}
                   className="font-semibold text-zinc-950 hover:text-teal-700"
                 >
                   {content.title}
@@ -47,7 +47,7 @@ export function ContentList({ contents }: { contents: ContentProjectWithRelation
                 </a>
               ) : null}
               <Link
-                href={`/contents/${content.id}/review`}
+                href={`/contents/${content.id}`}
                 className="rounded-md bg-zinc-950 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
               >
                 Revisar

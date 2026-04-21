@@ -17,7 +17,7 @@ export default async function ContentsPage() {
             <p className="text-sm font-medium uppercase tracking-[0.2em] text-teal-700">
               Historico
             </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Conteudos criados</h1>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">Conteudos</h1>
           </div>
           <Link
             href="/contents/new"

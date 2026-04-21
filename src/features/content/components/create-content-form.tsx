@@ -1,4 +1,5 @@
 import { createContentAction } from "@/features/content/actions";
+import { Save, Wand2 } from "lucide-react";
 
 export function CreateContentForm() {
   return (
@@ -20,15 +21,15 @@ export function CreateContentForm() {
           </div>
 
           <div>
-            <label htmlFor="caption" className="text-sm font-medium text-zinc-800">
-              Prompt e legenda do video
+            <label htmlFor="prompt" className="text-sm font-medium text-zinc-800">
+              Prompt
             </label>
             <textarea
-              id="caption"
-              name="caption"
+              id="prompt"
+              name="prompt"
               required
-              rows={6}
-              placeholder="Texto que sera aplicado no video vertical."
+              rows={5}
+              placeholder="Descreva o roteiro, estilo visual, ritmo e objetivo do conteudo."
               className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6"
             />
           </div>
@@ -48,6 +49,19 @@ export function CreateContentForm() {
               <option value="TIKTOK">TikTok</option>
               <option value="YOUTUBE_SHORTS">YouTube Shorts</option>
             </select>
+          </div>
+
+          <div>
+            <label htmlFor="caption" className="text-sm font-medium text-zinc-800">
+              Legenda
+            </label>
+            <textarea
+              id="caption"
+              name="caption"
+              rows={4}
+              placeholder="Texto opcional para aparecer no video."
+              className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6"
+            />
           </div>
         </section>
 
@@ -85,9 +99,22 @@ export function CreateContentForm() {
         </section>
       </div>
 
-      <div className="flex justify-end">
-        <button className="rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800">
-          Salvar e revisar
+      <div className="flex flex-col justify-end gap-3 sm:flex-row">
+        <button
+          name="intent"
+          value="save"
+          className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-900 transition hover:bg-stone-100"
+        >
+          <Save size={16} />
+          Salvar projeto
+        </button>
+        <button
+          name="intent"
+          value="generate"
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800"
+        >
+          <Wand2 size={16} />
+          Salvar e gerar video
         </button>
       </div>
     </form>

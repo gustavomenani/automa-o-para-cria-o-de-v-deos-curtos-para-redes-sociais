@@ -25,6 +25,7 @@ CREATE TABLE "content_projects" (
   "userId" TEXT,
   "title" TEXT NOT NULL,
   "prompt" TEXT NOT NULL,
+  "caption" TEXT,
   "contentType" "content_type" NOT NULL,
   "status" "project_status" NOT NULL DEFAULT 'draft',
   "errorMessage" TEXT,
