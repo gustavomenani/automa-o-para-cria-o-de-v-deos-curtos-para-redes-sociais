@@ -1,0 +1,64 @@
+import Link from "next/link";
+import { Clapperboard, History, LayoutDashboard, PlusCircle } from "lucide-react";
+
+const navItems = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/contents/new", label: "Novo conteudo", icon: PlusCircle },
+  { href: "/contents", label: "Historico", icon: History },
+];
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-stone-50">
+      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-stone-200 bg-white px-5 py-6 lg:block">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-lg bg-teal-700 text-white">
+            <Clapperboard size={20} />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">
+              Studio
+            </span>
+            <span className="block text-lg font-semibold">Short Videos</span>
+          </span>
+        </Link>
+
+        <nav className="mt-10 space-y-1">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-zinc-700 transition hover:bg-stone-100 hover:text-zinc-950"
+            >
+              <item.icon size={18} />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="absolute bottom-6 left-5 right-5 border-t border-stone-200 pt-5 text-xs leading-5 text-zinc-500">
+          MVP local com FFmpeg, Prisma e storage em disco. Manus e redes sociais ficam isolados em stubs.
+        </div>
+      </aside>
+
+      <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+        <div className="flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 font-semibold">
+            <Clapperboard size={20} className="text-teal-700" />
+            Short Videos
+          </Link>
+          <Link
+            href="/contents/new"
+            className="rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white"
+          >
+            Novo
+          </Link>
+        </div>
+      </header>
+
+      <main className="lg:pl-72">
+        <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">{children}</div>
+      </main>
+    </div>
+  );
+}
