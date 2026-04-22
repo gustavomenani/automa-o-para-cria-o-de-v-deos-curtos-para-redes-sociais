@@ -33,6 +33,16 @@ type ProcessResult = {
   stderr: string;
 };
 
+export const GENERATION_LOCKED_MESSAGE =
+  "Ja existe uma geracao em andamento para este projeto. Aguarde a conclusao antes de tentar novamente.";
+
+export class GenerationLockedError extends Error {
+  constructor() {
+    super(GENERATION_LOCKED_MESSAGE);
+    this.name = "GenerationLockedError";
+  }
+}
+
 function getFfmpegPath() {
   return process.env.FFMPEG_PATH || "ffmpeg";
 }
@@ -107,6 +117,23 @@ function toSafeGenerationError(error: unknown) {
   return SAFE_VIDEO_GENERATION_ERROR;
 }
 
+export async function acquireGenerationLock(projectId: string) {
+  const result = await prisma.contentProject.updateMany({
+    where: {
+      id: projectId,
+      status: { not: "PROCESSING" },
+    },
+    data: {
+      status: "PROCESSING",
+      errorMessage: null,
+    },
+  });
+
+  if (result.count === 0) {
+    throw new GenerationLockedError();
+  }
+}
+
 async function createAssSubtitleFile(cues: CaptionCue[], outputPath: string) {
   const events = cues
     .map((cue) => {
@@ -156,35 +183,32 @@ export class VideoService {
       .map((file) => file.path);
     const audioPath = project.mediaFiles.find((file) => file.type === "AUDIO")?.path;
 
-    const output = await getGeneratedVideoPath(project.id);
     let generatedVideoId: string | null = null;
 
+    if (imagePaths.length === 0) {
+      throw new Error("Projeto precisa de pelo menos uma imagem.");
+    }
+
+    if (!audioPath) {
+      throw new Error("Projeto precisa de um arquivo de audio.");
+    }
+
+    await acquireGenerationLock(project.id);
+
     try {
-      if (imagePaths.length === 0) {
-        throw new Error("Projeto precisa de pelo menos uma imagem.");
-      }
-
-      if (!audioPath) {
-        throw new Error("Projeto precisa de um arquivo de audio.");
-      }
-
-      await prisma.contentProject.update({
-        where: { id: project.id },
-        data: { status: "PROCESSING", errorMessage: null },
-      });
-
       const audioDuration = await this.getAudioDuration(audioPath);
       const transcriptionSegments = await transcriptionService.transcribe(audioPath);
       const generatedVideo = await prisma.generatedVideo.create({
         data: {
           projectId: project.id,
-          path: output,
+          path: "",
           duration: Math.round(audioDuration),
           resolution: "1080x1920",
           status: "PROCESSING",
         },
       });
       generatedVideoId = generatedVideo.id;
+      const output = await getGeneratedVideoPath(project.id, generatedVideo.id);
 
       const captionText =
         options?.captionText ??

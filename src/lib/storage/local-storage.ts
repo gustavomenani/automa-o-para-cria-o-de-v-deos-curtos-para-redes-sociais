@@ -66,8 +66,13 @@ export async function saveGeneratedAsset(
   };
 }
 
-export async function getGeneratedVideoPath(contentId: string) {
+export async function getGeneratedVideoPath(contentId: string, generatedVideoId?: string) {
   await ensureStorageFolders();
+
+  if (generatedVideoId) {
+    return path.join(generatedRoot, contentId, `${generatedVideoId}.mp4`);
+  }
+
   return path.join(generatedRoot, `${contentId}.mp4`);
 }
 
