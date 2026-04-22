@@ -12,6 +12,7 @@ import { requireUser } from "@/features/auth/session";
 import { videoService } from "@/features/video/services/video-service";
 import { geminiService } from "@/integrations/gemini/gemini-service";
 import { prisma } from "@/lib/prisma";
+import { normalizeSafeError } from "@/lib/api-response";
 import { deleteProjectStorage } from "@/lib/storage/local-storage";
 
 const GENERIC_CREATE_ERROR = "Nao foi possivel criar o conteudo.";
@@ -52,7 +53,7 @@ function friendlyErrorMessage(error: unknown, fallback: string) {
     return message;
   }
 
-  return looksInternalOrSensitive(message) ? fallback : message;
+  return normalizeSafeError(error, looksInternalOrSensitive(message) ? fallback : fallback);
 }
 
 function redirectWithNewContentError(error: unknown): never {
@@ -217,6 +218,34 @@ export async function generateGeminiAssetsAction(contentId: string) {
   }
 
   redirect(`/contents/${contentId}?gemini=1`);
+}
+
+export async function saveCaptionReviewAction(contentId: string, formData: FormData) {
+  const user = await requireUser();
+  const caption = String(formData.get("caption") ?? "").trim();
+
+  if (!caption || caption.length > 5000) {
+    redirect(
+      `/contents/${contentId}?error=${encodeURIComponent(
+        "Nao foi possivel concluir a acao. Revise os dados e tente novamente.",
+      )}`,
+    );
+  }
+
+  const updated = await prisma.contentProject.updateMany({
+    where: { id: contentId, userId: user.id },
+    data: {
+      caption,
+      errorMessage: null,
+    },
+  });
+
+  if (updated.count === 0) {
+    redirect(`/contents/${contentId}?error=${encodeURIComponent(FORBIDDEN_CONTENT_ERROR)}`);
+  }
+
+  await revalidateContentPages(contentId);
+  redirect(`/contents/${contentId}?captionSaved=1`);
 }
 
 type DeleteContentRedirectTarget = "contents" | "schedule";

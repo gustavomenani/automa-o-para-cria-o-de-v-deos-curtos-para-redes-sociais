@@ -12,6 +12,7 @@ import { AppShell } from "@/components/app-shell";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { SubmitButton } from "@/components/submit-button";
+import { CaptionReviewForm } from "@/features/content/components/caption-review-form";
 import { DeleteContentButton } from "@/features/content/components/delete-content-button";
 import { GenerateVideoButton } from "@/features/content/components/generate-video-button";
 import { generateContentVideoAction } from "@/features/content/actions";
@@ -26,6 +27,7 @@ import {
 } from "@/features/content/asset-run-display";
 import { getContentById } from "@/features/content/queries";
 import { schedulePostAction } from "@/features/schedule/actions";
+import { CAPTION_SYNC_WARNING } from "@/features/video/services/caption-helpers";
 import { readStoredGeminiPlan } from "@/integrations/gemini/gemini-service";
 import { formatContentType, formatFileSize } from "@/lib/formatters";
 import { toPublicFileUrl } from "@/lib/paths";
@@ -63,6 +65,8 @@ export default async function ContentDetailsPage({
     gemini?: string;
     geminiError?: string;
     error?: string;
+    captionSaved?: string;
+    scheduleError?: string;
     videoWarning?: string;
   }>;
 }) {
@@ -101,6 +105,10 @@ export default async function ContentDetailsPage({
           : "O video foi gerado, mas a sincronizacao da legenda pode estar aproximada. Revise antes de publicar.",
       )
     : null;
+  const shouldReviewCaption =
+    Boolean(content.caption) &&
+    (content.errorMessage === CAPTION_SYNC_WARNING ||
+      content.errorMessage?.toLowerCase().includes("legenda"));
 
   return (
     <AppShell>
@@ -166,6 +174,25 @@ export default async function ContentDetailsPage({
             message={decodeFeedbackMessage(
               feedback.videoWarning,
               "Os assets foram salvos, mas o video ainda precisa de revisao.",
+            )}
+          />
+        ) : null}
+
+        {feedback.captionSaved ? (
+          <FeedbackBanner
+            type="success"
+            title="Legenda revisada"
+            message="A legenda revisada foi salva para este conteudo."
+          />
+        ) : null}
+
+        {feedback.scheduleError ? (
+          <FeedbackBanner
+            type="error"
+            title="Nao foi possivel salvar o agendamento"
+            message={decodeFeedbackMessage(
+              feedback.scheduleError,
+              "Escolha uma data e horario futuros para salvar o agendamento.",
             )}
           />
         ) : null}
@@ -534,9 +561,15 @@ export default async function ContentDetailsPage({
 
             <section className="rounded-lg border border-stone-200 bg-white p-5">
               <h2 className="font-semibold">Legenda</h2>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-600">
-                {content.caption || "Sem legenda definida."}
-              </p>
+              <div className="mt-3">
+                {shouldReviewCaption && content.caption ? (
+                  <CaptionReviewForm contentId={content.id} caption={content.caption} />
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-zinc-600">
+                    {content.caption || "Sem legenda definida."}
+                  </p>
+                )}
+              </div>
             </section>
           </aside>
         </div>
