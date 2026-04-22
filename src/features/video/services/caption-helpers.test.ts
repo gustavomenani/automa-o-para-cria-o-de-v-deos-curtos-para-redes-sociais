@@ -3,6 +3,7 @@ import {
   CAPTION_SYNC_WARNING,
   createFallbackCaptionCues,
   createTranscribedCaptionCues,
+  calculateCaptionQualityScore,
   escapeAssText,
   extractSpokenCaptionText,
   mergeOrphanSegments,
@@ -101,6 +102,15 @@ describe("caption helpers", () => {
     );
 
     expect(result.quality.warning).toBe(CAPTION_SYNC_WARNING);
+  });
+
+  it("marks low-confidence caption quality for review", () => {
+    const quality = calculateCaptionQualityScore("texto original importante", "texto diferente", {
+      alignmentRatio: 0.2,
+      suspiciousCount: 1,
+    });
+
+    expect(quality.warning).toBe(CAPTION_SYNC_WARNING);
   });
 
   it("escapes ASS override braces without removing intended line breaks", () => {
