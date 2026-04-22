@@ -41,6 +41,20 @@ export async function getContentById(id: string) {
     include: {
       mediaFiles: true,
       generatedVideos: { orderBy: { createdAt: "desc" } },
+      assetGenerationRuns: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          id: true,
+          provider: true,
+          providerTaskId: true,
+          status: true,
+          summary: true,
+          missingAssets: true,
+          startedAt: true,
+          finishedAt: true,
+        },
+      },
     },
   });
 }

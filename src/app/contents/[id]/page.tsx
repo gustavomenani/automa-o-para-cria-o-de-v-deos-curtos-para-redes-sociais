@@ -15,6 +15,14 @@ import { SubmitButton } from "@/components/submit-button";
 import { DeleteContentButton } from "@/features/content/components/delete-content-button";
 import { GenerateVideoButton } from "@/features/content/components/generate-video-button";
 import { generateContentVideoAction } from "@/features/content/actions";
+import {
+  formatAssetRunStatus,
+  formatProviderName,
+  getDisplaySafeMessage,
+  getMissingAssets,
+  getRunSummaryMessage,
+  maskProviderTaskId,
+} from "@/features/content/asset-run-display";
 import { getContentById } from "@/features/content/queries";
 import { schedulePostAction } from "@/features/schedule/actions";
 import { readStoredGeminiPlan } from "@/integrations/gemini/gemini-service";
@@ -41,34 +49,6 @@ function decodeFeedbackMessage(value: string | undefined, fallback: string) {
   } catch {
     return fallback;
   }
-}
-
-function getDisplaySafeMessage(message: string, fallback: string) {
-  const trimmed = message.trim();
-
-  if (!trimmed) {
-    return fallback;
-  }
-
-  if (
-    trimmed.includes("GEMINI_API_KEY nao configurada. Adicione a chave no arquivo .env.") ||
-    trimmed.includes("GEMINI_API_KEY não configurada. Adicione a chave no arquivo .env.")
-  ) {
-    return trimmed;
-  }
-
-  if (
-    trimmed.length > 260 ||
-    /^[\[{]/.test(trimmed) ||
-    /\b(ffmpeg|ffprobe|stderr|stdout|spawn|traceback|stack|node_modules|libx264)\b/i.test(trimmed) ||
-    /\bat\s+\S+\s+\(/.test(trimmed) ||
-    /([A-Z]:\\|\/Users\/|\/home\/|storage[\\/]|\.env)/i.test(trimmed) ||
-    /(AIza[0-9A-Za-z_-]{20,}|MANUS_API_KEY|GEMINI_API_KEY=|sk-[0-9A-Za-z_-]{20,})/.test(trimmed)
-  ) {
-    return fallback;
-  }
-
-  return trimmed;
 }
 
 export default async function ContentDetailsPage({
@@ -100,6 +80,16 @@ export default async function ContentDetailsPage({
   const videoUrl = videoPath ? toPublicFileUrl(videoPath) : null;
   const today = getLocalDateInputValue(new Date());
   const geminiPlan = await readStoredGeminiPlan(content.id);
+  const latestRun = content.assetGenerationRuns.at(0);
+  const missingAssets = getMissingAssets(latestRun?.missingAssets);
+  const isMissingMedia = missingAssets.images || missingAssets.audio;
+  const manualActionRequired = latestRun?.status === "MANUAL_ACTION_REQUIRED";
+  const runSummaryMessage = latestRun
+    ? getRunSummaryMessage(
+        latestRun.summary,
+        "O provedor retornou detalhes internos. Revise o status e complete com upload manual se necessario.",
+      )
+    : null;
   const contentErrorMessage = content.errorMessage
     ? getDisplaySafeMessage(
         content.errorMessage,
@@ -139,18 +129,18 @@ export default async function ContentDetailsPage({
         {feedback.gemini ? (
           <FeedbackBanner
             type="success"
-            title="Assets gerados com Gemini"
-            message="O roteiro e a legenda retornados pela API foram salvos. Imagens e audio tambem aparecem quando o modelo permite gerar esses arquivos."
+            title="Assets processados por IA"
+            message="O fluxo Manus-first salvou o plano retornado. Quando Manus nao entrega todos os arquivos, Gemini pode complementar e o upload manual continua disponivel."
           />
         ) : null}
 
         {feedback.geminiError ? (
           <FeedbackBanner
             type="error"
-            title="Gemini nao gerou os assets"
+            title="Nao foi possivel gerar assets automaticamente"
             message={decodeFeedbackMessage(
               feedback.geminiError,
-              "Nao foi possivel gerar assets automaticamente.",
+              "Nao foi possivel gerar assets automaticamente. Revise configuracao da chave/provedor e complete com upload manual.",
             )}
           />
         ) : null}
@@ -183,6 +173,71 @@ export default async function ContentDetailsPage({
             title={content.status === "ERROR" ? "Geracao com erro" : "Revise a legenda"}
             message={contentErrorMessage}
           />
+        ) : null}
+
+        {isMissingMedia ? (
+          <FeedbackBanner
+            type="info"
+            title="Assets incompletos"
+            message={`O provedor de IA gerou texto, mas faltou ${missingAssets.images ? "imagens" : ""}${missingAssets.images && missingAssets.audio ? " e " : ""}${missingAssets.audio ? "áudio" : ""}. Complete manualmente enviando os arquivos ou gere novamente.`}
+          />
+        ) : null}
+
+        {manualActionRequired ? (
+          <FeedbackBanner
+            type="info"
+            title="Ação manual necessária"
+            message="O provedor de IA pausou o processo solicitando interação manual. Verifique sua conta no provedor."
+          />
+        ) : null}
+
+        {latestRun ? (
+          <section className="rounded-lg border border-stone-200 bg-white p-5">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+              <div>
+                <p className="text-sm font-medium uppercase tracking-[0.2em] text-teal-700">
+                  Geracao de assets
+                </p>
+                <h2 className="mt-2 text-xl font-semibold">
+                  {formatProviderName(latestRun.provider)}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-zinc-600">
+                  Status da ultima tentativa automatica. Se faltarem midias, complete com upload
+                  manual antes de gerar o MP4.
+                </p>
+              </div>
+              <span className="inline-flex w-fit rounded-full bg-stone-100 px-3 py-1 text-sm font-semibold text-zinc-700">
+                {formatAssetRunStatus(latestRun.status)}
+              </span>
+            </div>
+
+            <dl className="mt-5 grid gap-3 border-t border-stone-200 pt-5 text-sm sm:grid-cols-4">
+              <div>
+                <dt className="text-zinc-500">Provedor</dt>
+                <dd className="mt-1 font-medium">{formatProviderName(latestRun.provider)}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Task ID</dt>
+                <dd className="mt-1 font-medium">{maskProviderTaskId(latestRun.providerTaskId)}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Iniciado em</dt>
+                <dd className="mt-1 font-medium">{latestRun.startedAt.toLocaleString("pt-BR")}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-500">Finalizado em</dt>
+                <dd className="mt-1 font-medium">
+                  {latestRun.finishedAt ? latestRun.finishedAt.toLocaleString("pt-BR") : "em aberto"}
+                </dd>
+              </div>
+            </dl>
+
+            {runSummaryMessage ? (
+              <p className="mt-4 rounded-md bg-stone-50 p-4 text-sm leading-6 text-zinc-600">
+                {runSummaryMessage}
+              </p>
+            ) : null}
+          </section>
         ) : null}
 
         <section className="rounded-lg border border-stone-200 bg-white p-5">
