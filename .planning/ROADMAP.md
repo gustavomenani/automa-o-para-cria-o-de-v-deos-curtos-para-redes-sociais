@@ -92,6 +92,16 @@ Plans:
 **UI hint:** yes
 
 **Requirements:** MED-04, VID-06, CAP-06, REV-04, SCH-04, SEC-01, SEC-02, SEC-03, SEC-04, OPS-05
+**Plans:** 7 plans
+
+Plans:
+- [ ] 03-01-PLAN.md - Create auth/session foundation and owner-aware settings schema.
+- [ ] 03-02-PLAN.md - Scope content pages and server actions by authenticated owner.
+- [ ] 03-03-PLAN.md - Protect API, file-serving, and settings surfaces.
+- [ ] 03-04-PLAN.md - Enforce upload limits, signatures, and audio duration validation.
+- [ ] 03-05-PLAN.md - Prevent concurrent video generation corruption.
+- [ ] 03-06-PLAN.md - Add caption review, schedule validation, and redacted errors.
+- [ ] 03-07-PLAN.md - Add the high-risk Phase 3 automated test net.
 
 **What remains:**
 1. Add simple authentication and require session on all mutation/read routes.
