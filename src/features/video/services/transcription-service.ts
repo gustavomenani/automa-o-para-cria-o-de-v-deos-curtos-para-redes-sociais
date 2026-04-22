@@ -5,6 +5,14 @@ export type TranscriptionSegment = {
   start: number;
   end: number;
   text: string;
+  words?: TranscriptionWord[];
+};
+
+export type TranscriptionWord = {
+  word: string;
+  start: number;
+  end: number;
+  confidence?: number | null;
 };
 
 type TranscriptionResponse = {
@@ -107,6 +115,23 @@ export class TranscriptionService {
           start: segment.start,
           end: segment.end,
           text: segment.text.trim(),
+          words: segment.words
+            ?.filter(
+              (word) =>
+                word.word.trim() &&
+                Number.isFinite(word.start) &&
+                Number.isFinite(word.end) &&
+                word.end > word.start,
+            )
+            .map((word) => ({
+              word: word.word.trim(),
+              start: word.start,
+              end: word.end,
+              confidence:
+                typeof word.confidence === "number" && Number.isFinite(word.confidence)
+                  ? word.confidence
+                  : null,
+            })),
         }));
     } catch {
       return null;

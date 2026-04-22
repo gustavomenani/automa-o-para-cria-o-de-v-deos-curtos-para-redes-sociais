@@ -38,22 +38,39 @@ def main() -> int:
         language=args.language,
         vad_filter=True,
         beam_size=5,
-        word_timestamps=False,
+        word_timestamps=True,
     )
+
+    output_segments = []
+
+    for segment in segments:
+        words = []
+        for word in segment.words or []:
+            if word.word.strip():
+                words.append(
+                    {
+                        "word": word.word.strip(),
+                        "start": round(float(word.start), 3),
+                        "end": round(float(word.end), 3),
+                        "confidence": getattr(word, "probability", None),
+                    }
+                )
+
+        if segment.text.strip():
+            output_segments.append(
+                {
+                    "start": round(float(segment.start), 3),
+                    "end": round(float(segment.end), 3),
+                    "text": segment.text.strip(),
+                    "words": words,
+                }
+            )
 
     payload = {
         "ok": True,
         "language": info.language,
         "language_probability": info.language_probability,
-        "segments": [
-            {
-                "start": round(float(segment.start), 3),
-                "end": round(float(segment.end), 3),
-                "text": segment.text.strip(),
-            }
-            for segment in segments
-            if segment.text.strip()
-        ],
+        "segments": output_segments,
     }
 
     print(json.dumps(payload, ensure_ascii=False))
