@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { CreateContentForm } from "@/features/content/components/create-content-form";
+import { requireUser } from "@/features/auth/session";
 
 export default async function NewContentPage({
   searchParams,
@@ -8,6 +9,7 @@ export default async function NewContentPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const feedback = await searchParams;
+  await requireUser();
 
   return (
     <AppShell>

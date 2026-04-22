@@ -7,6 +7,8 @@ import {
   createProjectWithUploads,
   parseProjectFormData,
 } from "@/features/content/services/upload-service";
+import { runAssetPipelineForProject } from "@/features/content/services/ai-asset-orchestrator";
+import { requireUser } from "@/features/auth/session";
 import { videoService } from "@/features/video/services/video-service";
 import { geminiService } from "@/integrations/gemini/gemini-service";
 import { prisma } from "@/lib/prisma";
@@ -15,6 +17,7 @@ import { deleteProjectStorage } from "@/lib/storage/local-storage";
 const GENERIC_CREATE_ERROR = "Nao foi possivel criar o conteudo.";
 const GENERIC_ASSET_ERROR = "Nao foi possivel gerar os assets automaticamente.";
 const GENERIC_VIDEO_ERROR = "Nao foi possivel gerar o video. Revise os arquivos enviados e tente novamente.";
+const FORBIDDEN_CONTENT_ERROR = "Voce nao tem acesso a este conteudo.";
 
 function isKnownFriendlyMessage(message: string) {
   return [
@@ -76,28 +79,28 @@ async function revalidateContentPages(contentId?: string) {
 }
 
 export async function createContentAction(formData: FormData) {
+  const user = await requireUser();
   const parsedForm = parseContentFormOrRedirect(formData);
   const { input, files } = parsedForm;
   const intent = formData.get("intent");
 
   if (intent === "gemini") {
-    let plan;
+    let content;
 
     try {
-      plan = await geminiService.generateReelsPlan(input.prompt);
+      content = await createContentProject(input, user.id);
     } catch (error) {
       redirectWithNewContentError(error);
     }
 
-    const content = await createContentProject(input);
     let targetUrl = `/contents/${content.id}?gemini=1`;
 
     try {
-      const result = await geminiService.generateTestAssetsForProject(
-        content.id,
-        content.prompt,
-        plan,
-      );
+      const result = await runAssetPipelineForProject({
+        projectId: content.id,
+        prompt: input.prompt,
+      });
+
       const canGenerateVideo = result.images.length > 0 && Boolean(result.audio);
       const params = new URLSearchParams({ gemini: "1" });
 
@@ -114,9 +117,17 @@ export async function createContentAction(formData: FormData) {
       } else {
         params.set(
           "videoWarning",
-          "A Gemini retornou o plano textual, mas nao gerou imagens e audio suficientes para montar o MP4 automaticamente.",
+          `O provedor (${result.providerUsed}) retornou o plano textual, mas não gerou imagens e áudio suficientes para montar o MP4 automaticamente. Complete manualmente.`,
         );
       }
+
+      await prisma.contentProject.update({
+        where: { id: content.id },
+        data: {
+          status: result.status === "FAILED" || result.status === "MANUAL_ACTION_REQUIRED" ? "ERROR" : "DRAFT",
+          errorMessage: result.warnings.length > 0 ? result.warnings.join(" | ") : null,
+        },
+      });
 
       await revalidateContentPages(content.id);
       targetUrl = `/contents/${content.id}?${params.toString()}`;
@@ -141,7 +152,7 @@ export async function createContentAction(formData: FormData) {
   let content;
 
   try {
-    content = await createProjectWithUploads(input, files);
+    content = await createProjectWithUploads(input, files, user.id);
   } catch (error) {
     redirectWithNewContentError(error);
   }
@@ -168,9 +179,11 @@ export async function createContentAction(formData: FormData) {
 }
 
 export async function generateContentVideoAction(contentId: string) {
+  const user = await requireUser();
   let targetUrl = `/contents/${contentId}?generated=1`;
 
   try {
+    await assertOwnedContent(contentId, user.id);
     await videoService.generateProjectVideo(contentId);
   } catch (error) {
     targetUrl = `/contents/${contentId}?error=${encodeURIComponent(
@@ -183,14 +196,16 @@ export async function generateContentVideoAction(contentId: string) {
 }
 
 export async function generateGeminiAssetsAction(contentId: string) {
+  const user = await requireUser();
+
   try {
-    const project = await prisma.contentProject.findUnique({
-      where: { id: contentId },
+    const project = await prisma.contentProject.findFirst({
+      where: { id: contentId, userId: user.id },
       select: { prompt: true },
     });
 
     if (!project) {
-      throw new Error("Conteudo nao encontrado.");
+      throw new Error(FORBIDDEN_CONTENT_ERROR);
     }
 
     await geminiService.generateTestAssetsForProject(contentId, project.prompt);
@@ -211,12 +226,26 @@ const deleteRedirects: Record<DeleteContentRedirectTarget, string> = {
   schedule: "/schedule?deleted=1",
 };
 
+async function assertOwnedContent(contentId: string, userId: string) {
+  const project = await prisma.contentProject.findFirst({
+    where: { id: contentId, userId },
+    select: { id: true },
+  });
+
+  if (!project) {
+    throw new Error(FORBIDDEN_CONTENT_ERROR);
+  }
+
+  return project;
+}
+
 export async function deleteContentProjectAction(
   contentId: string,
   redirectTarget: DeleteContentRedirectTarget = "contents",
 ) {
-  const project = await prisma.contentProject.findUnique({
-    where: { id: contentId },
+  const user = await requireUser();
+  const project = await prisma.contentProject.findFirst({
+    where: { id: contentId, userId: user.id },
     include: {
       mediaFiles: true,
       generatedVideos: true,

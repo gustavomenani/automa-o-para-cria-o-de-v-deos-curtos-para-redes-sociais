@@ -90,11 +90,15 @@ function mediaData(projectId: string, type: "IMAGE" | "AUDIO", storedFile: Store
   };
 }
 
-export async function attachMediaFilesToProject(projectId: string, files: ProjectFilesInput) {
+export async function attachMediaFilesToProject(
+  projectId: string,
+  files: ProjectFilesInput,
+  userId?: string,
+) {
   validateProjectFiles(files, { requireAudio: false });
 
-  const project = await prisma.contentProject.findUnique({
-    where: { id: projectId },
+  const project = await prisma.contentProject.findFirst({
+    where: { id: projectId, ...(userId ? { userId } : {}) },
     select: { id: true },
   });
 
@@ -124,7 +128,7 @@ export async function attachMediaFilesToProject(projectId: string, files: Projec
   });
 }
 
-export async function createContentProject(input: ContentProjectInput) {
+export async function createContentProject(input: ContentProjectInput, userId?: string) {
   const parsed = contentProjectInputSchema.parse(input);
 
   return prisma.contentProject.create({
@@ -134,18 +138,23 @@ export async function createContentProject(input: ContentProjectInput) {
       caption: parsed.caption || null,
       contentType: parsed.contentType,
       status: "DRAFT",
+      userId,
     },
   });
 }
 
-export async function createProjectWithUploads(input: ContentProjectInput, files: ProjectFilesInput) {
+export async function createProjectWithUploads(
+  input: ContentProjectInput,
+  files: ProjectFilesInput,
+  userId?: string,
+) {
   const parsed = contentProjectInputSchema.parse(input);
   validateProjectFiles(files);
 
-  const project = await createContentProject(parsed);
+  const project = await createContentProject(parsed, userId);
 
   try {
-    await attachMediaFilesToProject(project.id, files);
+    await attachMediaFilesToProject(project.id, files, userId);
 
     return prisma.contentProject.findUniqueOrThrow({
       where: { id: project.id },
