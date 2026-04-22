@@ -59,15 +59,21 @@ O projeto esta entre Phase 1 e Phase 2:
 **UI hint:** yes
 
 **Requirements:** CONT-02, AI-01, AI-02, AI-03, AI-04, AI-05
+**Plans:** 3 plans
+
+Plans:
+- [x] 02-01-PLAN.md - Add persistence contract for provider task/status/summary tracking.
+- [x] 02-02-PLAN.md - Implement Manus-first orchestration with Gemini fallback and safe run persistence.
+- [x] 02-03-PLAN.md - Surface pipeline status in UI and align settings/docs messaging.
 
 **Already present:**
 - Gemini service can create plan, captions, prompts, images/audio when model access allows.
 - Manus service has real API structure/fallback behavior and settings support.
-- Generated assets can be saved as `MediaFile`.
+- Generated assets can be saved as MediaFile.
 
 **What remains:**
 1. Decide provider priority for MVP: Manus primary, Gemini fallback/test.
-2. Normalize Manus task outputs into internal `MediaFile` and text plan consistently.
+2. Normalize Manus task outputs into internal MediaFile and text plan consistently.
 3. Show clear UI state when provider returns text but no images/audio.
 4. Persist provider task IDs/status/log summaries.
 5. Add failure handling for quota, invalid key, unavailable model, empty attachments and human-interaction-required.
@@ -77,6 +83,7 @@ O projeto esta entre Phase 1 e Phase 2:
 2. When provider returns images/audio, files are saved under the project and visible in review.
 3. When provider cannot generate all assets, the user sees what is missing and can complete manually.
 4. API keys are never exposed to client code or committed files.
+
 
 ## Phase 3: Product Hardening
 
@@ -153,3 +160,5 @@ O projeto esta entre Phase 1 e Phase 2:
 
 ---
 *Roadmap created: 2026-04-21*
+
+

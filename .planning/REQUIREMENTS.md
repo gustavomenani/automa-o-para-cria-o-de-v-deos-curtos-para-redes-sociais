@@ -8,7 +8,7 @@
 ### Content
 
 - [ ] **CONT-01**: Usuario pode criar conteudo com titulo, prompt principal, tipo de conteudo e legenda/caption.
-- [ ] **CONT-02**: Usuario pode criar conteudo automaticamente a partir de prompt usando um provedor de IA configurado.
+- [x] **CONT-02**: Usuario pode criar conteudo automaticamente a partir de prompt usando um provedor de IA configurado.
 - [ ] **CONT-03**: Usuario pode manter o fluxo manual de upload de imagens e audio quando IA falhar ou nao estiver configurada.
 - [ ] **CONT-04**: Usuario pode visualizar historico/lista de conteudos por status.
 - [ ] **CONT-05**: Usuario pode excluir um conteudo e remover midias, videos e agendamentos relacionados.
@@ -23,11 +23,11 @@
 
 ### AI Assets
 
-- [ ] **AI-01**: Sistema envia prompt para Manus quando API/chave estiver disponivel e registra tarefa/status.
-- [ ] **AI-02**: Sistema baixa/organiza imagens, audio, roteiro, captions e anexos retornados por Manus.
-- [ ] **AI-03**: Sistema trata respostas inesperadas, expiradas, incompletas ou que exigem interacao humana.
-- [ ] **AI-04**: Sistema usa Gemini apenas como integracao de teste/fallback, sem substituir a estrutura futura de Manus.
-- [ ] **AI-05**: Sistema nunca expoe chaves de IA no frontend ou no codigo.
+- [x] **AI-01**: Sistema envia prompt para Manus quando API/chave estiver disponivel e registra tarefa/status.
+- [x] **AI-02**: Sistema baixa/organiza imagens, audio, roteiro, captions e anexos retornados por Manus.
+- [x] **AI-03**: Sistema trata respostas inesperadas, expiradas, incompletas ou que exigem interacao humana.
+- [x] **AI-04**: Sistema usa Gemini apenas como integracao de teste/fallback, sem substituir a estrutura futura de Manus.
+- [x] **AI-05**: Sistema nunca expoe chaves de IA no frontend ou no codigo.
 
 ### Video
 
@@ -122,7 +122,7 @@
 | MED-05 | Phase 4 | Pending |
 | AI-01 | Phase 2 | In Progress |
 | AI-02 | Phase 2 | In Progress |
-| AI-03 | Phase 2 | Pending |
+| AI-03 | Phase 2 | Complete |
 | AI-04 | Phase 2 | Existing |
 | AI-05 | Phase 2 | Existing |
 | VID-01 | Phase 1 | Existing |

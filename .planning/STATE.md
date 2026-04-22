@@ -1,3 +1,17 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: human_verification_needed
+last_updated: "2026-04-22T21:07:55.832Z"
+progress:
+  total_phases: 5
+  completed_phases: 1
+  total_plans: 6
+  completed_plans: 6
+  percent: 100
+---
+
 # Project State
 
 **Updated:** 2026-04-21
@@ -6,16 +20,17 @@
 
 ## Current Focus
 
-Phase 1: Stabilize Core MVP.
+Phase 2: AI Asset Pipeline human validation.
 
-The project is not at zero. It already has a working local MVP shell and most of the prompt/upload/video/review/schedule flow. The current active blocker is subtitle quality: preserving Whisper timing while correcting transcription text against the original script/caption without introducing delay or awkward formatting.
+Phase 2 plan execution is complete and automated verification passed. The remaining checkpoint is a browser/provider UAT run for prompt-based generation with partial or missing media, recorded in `.planning/phases/02-ai-asset-pipeline/02-HUMAN-UAT.md`.
 
 ## Planning Status
 
 - **Phase 1**: Planned and verified.
-- **Plan count**: 3 plans in 3 waves.
-- **Plan directory**: `.planning/phases/01-stabilize-core-mvp/`
-- **Verification**: Plan checker passed after one targeted revision.
+- **Phase 2**: Executed; automated verification passed; human UAT pending.
+- **Plan count (Phase 2)**: 3 plans in 3 waves.
+- **Plan directory (Phase 2)**: .planning/phases/02-ai-asset-pipeline/
+- **Verification**: `02-VERIFICATION.md` status is `human_needed`.
 
 ## Current Codebase Map
 
@@ -66,7 +81,7 @@ These files currently have uncommitted local changes and should be handled caref
 7. No automated tests.
 8. Upload validation lacks size/signature/duration limits.
 9. Local filesystem storage is not production-safe for multi-instance or ephemeral deploy.
-10. README has at least one stale section saying Manus is mock-only.
+10. Phase 2 provider behavior still needs live Manus/Gemini UAT for partial and manual-action outcomes.
 
 ## Working Tree Note
 
@@ -80,7 +95,7 @@ Do not revert them blindly; they are part of the ongoing subtitle work.
 
 ## Next Recommended Command
 
-Use `$gsd-execute-phase 1` to execute the immediate stabilization phase.
+Validate `.planning/phases/02-ai-asset-pipeline/02-HUMAN-UAT.md` with a live or fixture-backed prompt run.
 
 ---
-*Last updated: 2026-04-21 after Phase 1 planning*
+*Last updated: 2026-04-22 after Phase 2 execution*
