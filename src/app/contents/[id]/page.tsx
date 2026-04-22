@@ -31,6 +31,46 @@ function getLocalDateInputValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function decodeFeedbackMessage(value: string | undefined, fallback: string) {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    return getDisplaySafeMessage(decodeURIComponent(value), fallback);
+  } catch {
+    return fallback;
+  }
+}
+
+function getDisplaySafeMessage(message: string, fallback: string) {
+  const trimmed = message.trim();
+
+  if (!trimmed) {
+    return fallback;
+  }
+
+  if (
+    trimmed.includes("GEMINI_API_KEY nao configurada. Adicione a chave no arquivo .env.") ||
+    trimmed.includes("GEMINI_API_KEY não configurada. Adicione a chave no arquivo .env.")
+  ) {
+    return trimmed;
+  }
+
+  if (
+    trimmed.length > 260 ||
+    /^[\[{]/.test(trimmed) ||
+    /\b(ffmpeg|ffprobe|stderr|stdout|spawn|traceback|stack|node_modules|libx264)\b/i.test(trimmed) ||
+    /\bat\s+\S+\s+\(/.test(trimmed) ||
+    /([A-Z]:\\|\/Users\/|\/home\/|storage[\\/]|\.env)/i.test(trimmed) ||
+    /(AIza[0-9A-Za-z_-]{20,}|MANUS_API_KEY|GEMINI_API_KEY=|sk-[0-9A-Za-z_-]{20,})/.test(trimmed)
+  ) {
+    return fallback;
+  }
+
+  return trimmed;
+}
+
 export default async function ContentDetailsPage({
   params,
   searchParams,
@@ -60,6 +100,14 @@ export default async function ContentDetailsPage({
   const videoUrl = videoPath ? toPublicFileUrl(videoPath) : null;
   const today = getLocalDateInputValue(new Date());
   const geminiPlan = await readStoredGeminiPlan(content.id);
+  const contentErrorMessage = content.errorMessage
+    ? getDisplaySafeMessage(
+        content.errorMessage,
+        content.status === "ERROR"
+          ? "Nao foi possivel concluir a geracao. Revise os arquivos enviados e tente novamente."
+          : "O video foi gerado, mas a sincronizacao da legenda pode estar aproximada. Revise antes de publicar.",
+      )
+    : null;
 
   return (
     <AppShell>
@@ -100,7 +148,10 @@ export default async function ContentDetailsPage({
           <FeedbackBanner
             type="error"
             title="Gemini nao gerou os assets"
-            message={decodeURIComponent(feedback.geminiError)}
+            message={decodeFeedbackMessage(
+              feedback.geminiError,
+              "Nao foi possivel gerar assets automaticamente.",
+            )}
           />
         ) : null}
 
@@ -108,7 +159,10 @@ export default async function ContentDetailsPage({
           <FeedbackBanner
             type="error"
             title="Nao foi possivel concluir a acao"
-            message={decodeURIComponent(feedback.error)}
+            message={decodeFeedbackMessage(
+              feedback.error,
+              "Nao foi possivel concluir a acao. Revise os dados e tente novamente.",
+            )}
           />
         ) : null}
 
@@ -116,7 +170,18 @@ export default async function ContentDetailsPage({
           <FeedbackBanner
             type="info"
             title="Assets salvos, video pendente"
-            message={decodeURIComponent(feedback.videoWarning)}
+            message={decodeFeedbackMessage(
+              feedback.videoWarning,
+              "Os assets foram salvos, mas o video ainda precisa de revisao.",
+            )}
+          />
+        ) : null}
+
+        {contentErrorMessage ? (
+          <FeedbackBanner
+            type={content.status === "ERROR" ? "error" : "info"}
+            title={content.status === "ERROR" ? "Geracao com erro" : "Revise a legenda"}
+            message={contentErrorMessage}
           />
         ) : null}
 
@@ -206,12 +271,6 @@ export default async function ContentDetailsPage({
                 </div>
               )}
             </div>
-
-            {content.errorMessage ? (
-              <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
-                {content.errorMessage}
-              </div>
-            ) : null}
 
             {generatedVideo ? (
               <dl className="mt-5 grid gap-3 border-t border-stone-200 pt-5 text-sm sm:grid-cols-3">

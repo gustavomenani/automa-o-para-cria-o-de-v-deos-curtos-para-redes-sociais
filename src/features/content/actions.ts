@@ -12,12 +12,48 @@ import { geminiService } from "@/integrations/gemini/gemini-service";
 import { prisma } from "@/lib/prisma";
 import { deleteProjectStorage } from "@/lib/storage/local-storage";
 
+const GENERIC_CREATE_ERROR = "Nao foi possivel criar o conteudo.";
+const GENERIC_ASSET_ERROR = "Nao foi possivel gerar os assets automaticamente.";
+const GENERIC_VIDEO_ERROR = "Nao foi possivel gerar o video. Revise os arquivos enviados e tente novamente.";
+
+function isKnownFriendlyMessage(message: string) {
+  return [
+    "GEMINI_API_KEY nao configurada. Adicione a chave no arquivo .env.",
+    "GEMINI_API_KEY não configurada. Adicione a chave no arquivo .env.",
+    "Projeto precisa de pelo menos uma imagem.",
+    "Projeto precisa de um arquivo de audio.",
+    "Projeto nao encontrado.",
+    "Conteudo nao encontrado.",
+  ].some((knownMessage) => message.includes(knownMessage));
+}
+
+function looksInternalOrSensitive(message: string) {
+  return (
+    message.length > 260 ||
+    /^[\[{]/.test(message.trim()) ||
+    /\b(ffmpeg|ffprobe|stderr|stdout|spawn|traceback|stack|node_modules|libx264)\b/i.test(message) ||
+    /\bat\s+\S+\s+\(/.test(message) ||
+    /([A-Z]:\\|\/Users\/|\/home\/|storage[\\/]|\.env)/i.test(message) ||
+    /(AIza[0-9A-Za-z_-]{20,}|MANUS_API_KEY|GEMINI_API_KEY=|sk-[0-9A-Za-z_-]{20,})/.test(message)
+  );
+}
+
 function friendlyErrorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  const message = error instanceof Error ? error.message.trim() : "";
+
+  if (!message) {
+    return fallback;
+  }
+
+  if (isKnownFriendlyMessage(message)) {
+    return message;
+  }
+
+  return looksInternalOrSensitive(message) ? fallback : message;
 }
 
 function redirectWithNewContentError(error: unknown): never {
-  const message = friendlyErrorMessage(error, "Falha ao criar conteudo.");
+  const message = friendlyErrorMessage(error, GENERIC_CREATE_ERROR);
   redirect(`/contents/new?error=${encodeURIComponent(message)}`);
 }
 
@@ -89,13 +125,13 @@ export async function createContentAction(formData: FormData) {
         where: { id: content.id },
         data: {
           status: "ERROR",
-          errorMessage: friendlyErrorMessage(error, "Falha ao gerar assets com Gemini."),
+          errorMessage: friendlyErrorMessage(error, GENERIC_ASSET_ERROR),
         },
       });
 
       await revalidateContentPages(content.id);
       targetUrl = `/contents/${content.id}?geminiError=${encodeURIComponent(
-        friendlyErrorMessage(error, "Falha ao gerar assets com Gemini."),
+        friendlyErrorMessage(error, GENERIC_ASSET_ERROR),
       )}`;
     }
 
@@ -132,10 +168,18 @@ export async function createContentAction(formData: FormData) {
 }
 
 export async function generateContentVideoAction(contentId: string) {
-  await videoService.generateProjectVideo(contentId);
+  let targetUrl = `/contents/${contentId}?generated=1`;
+
+  try {
+    await videoService.generateProjectVideo(contentId);
+  } catch (error) {
+    targetUrl = `/contents/${contentId}?error=${encodeURIComponent(
+      friendlyErrorMessage(error, GENERIC_VIDEO_ERROR),
+    )}`;
+  }
 
   await revalidateContentPages(contentId);
-  redirect(`/contents/${contentId}?generated=1`);
+  redirect(targetUrl);
 }
 
 export async function generateGeminiAssetsAction(contentId: string) {
@@ -153,7 +197,7 @@ export async function generateGeminiAssetsAction(contentId: string) {
 
     await revalidateContentPages(contentId);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha ao gerar assets com Gemini.";
+    const message = friendlyErrorMessage(error, GENERIC_ASSET_ERROR);
     redirect(`/contents/${contentId}?geminiError=${encodeURIComponent(message)}`);
   }
 

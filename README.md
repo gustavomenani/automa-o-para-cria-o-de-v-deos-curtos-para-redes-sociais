@@ -116,7 +116,7 @@ src/
       services/             # VideoService com FFmpeg/ffprobe
   integrations/
     gemini/                 # integracao real de teste com Google Gemini
-    manus/                  # stub para integracao futura
+    manus/                  # cliente Manus com API real quando configurada e fallback local
     social/                 # stub para publicacao/agendamento futuro
   lib/
     api-response.ts         # respostas padronizadas de API
@@ -259,7 +259,8 @@ Ao salvar, o sistema cria um `ScheduledPost`, atualiza o projeto para `SCHEDULED
 
 ## Manus
 
-A integracao futura com Manus fica preparada em `src/integrations/manus/manus-service.ts`.
+A integracao com Manus fica concentrada em `src/integrations/manus/manus-service.ts`.
+Quando `MANUS_API_KEY` estiver no `.env` ou a chave estiver salva em `/settings`, o service usa a API da Manus para criar tarefas, consultar mensagens e baixar anexos retornados. Sem chave configurada, o app mantem comportamento de fallback/mock para nao quebrar o fluxo manual do MVP.
 
 O service expõe:
 
@@ -268,7 +269,7 @@ O service expõe:
 - `listTaskMessages(taskId)`
 - `downloadGeneratedFiles(taskId)`
 
-Por enquanto todos os metodos retornam dados mockados. Quando a API real estiver disponivel, a troca deve ficar concentrada dentro de `ManusService`.
+O uso real da API depende de chave e plano com acesso liberado. Se a Manus nao retornar imagens/audio suficientes, o usuario ainda pode completar o projeto pelo upload manual.
 
 As configuracoes da Manus ficam em `/settings` e sao salvas em `manus_settings`:
 
@@ -283,7 +284,7 @@ As configuracoes da Manus ficam em `/settings` e sao salvas em `manus_settings`:
 - `features/content` concentra o fluxo principal para evitar espalhar regra de negocio pelas paginas.
 - `features/video/services/video-service.ts` isola a chamada ao FFmpeg. Esse modulo pode virar um worker/fila depois sem mudar as telas.
 - `lib/storage/local-storage.ts` encapsula gravacao em disco. Uma futura migracao para S3/R2 deve preservar a mesma ideia de contrato.
-- `integrations/manus` e `integrations/social` existem apenas como interfaces/stubs. Nenhuma chamada externa real e feita no MVP.
+- `integrations/manus` possui cliente real quando a chave esta configurada e fallback quando nao esta. `integrations/social` permanece como interface/stub; nenhuma publicacao real em Instagram, TikTok ou YouTube e feita no MVP.
 - O banco salva projetos, arquivos de midia, videos gerados, contas sociais e agendamentos futuros.
 
 ## Rodando do zero
