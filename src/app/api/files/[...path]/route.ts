@@ -1,6 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/features/auth/session";
+import { prisma } from "@/lib/prisma";
 import { storageRoot } from "@/lib/paths";
 
 const mimeTypes: Record<string, string> = {
@@ -18,12 +20,33 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Faca login para acessar seus projetos." }, { status: 401 });
+  }
+
   const { path: pathSegments } = await params;
   const filePath = path.resolve(storageRoot, ...pathSegments);
   const relative = path.relative(storageRoot, filePath);
 
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    return NextResponse.json({ error: "Invalid path." }, { status: 400 });
+    return NextResponse.json({ error: "Arquivo nao encontrado." }, { status: 404 });
+  }
+
+  const [mediaFile, generatedVideo] = await Promise.all([
+    prisma.mediaFile.findFirst({
+      where: { path: filePath, project: { userId: user.id } },
+      select: { id: true },
+    }),
+    prisma.generatedVideo.findFirst({
+      where: { path: filePath, project: { userId: user.id } },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!mediaFile && !generatedVideo) {
+    return NextResponse.json({ error: "Arquivo nao encontrado." }, { status: 404 });
   }
 
   try {
@@ -43,6 +66,6 @@ export async function GET(
 
     return new NextResponse(file, { headers });
   } catch {
-    return NextResponse.json({ error: "File not found." }, { status: 404 });
+    return NextResponse.json({ error: "Arquivo nao encontrado." }, { status: 404 });
   }
 }
