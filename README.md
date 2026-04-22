@@ -47,6 +47,9 @@ GEMINI_API_KEY="sua-chave-da-gemini"
 
 Sem essa variavel, o app continua funcionando no fluxo manual e mostra um erro amigavel ao clicar em `Gerar assets com Gemini`.
 
+Para usar Manus como provedor principal, configure `MANUS_API_KEY` no `.env` ou salve a chave em `/settings`.
+As chaves sao usadas somente no servidor e nao devem ser commitadas.
+
 6. Para legendas com timestamps reais, instale o Whisper local:
 
 ```bash
@@ -234,15 +237,29 @@ O service le a chave apenas do servidor, por `process.env.GEMINI_API_KEY`, e exp
 - `generateNarrationAudio(script)`: tenta gerar narracao em portugues brasileiro com `gemini-2.5-flash-preview-tts`.
 - `generateTestAssetsForProject(projectId, prompt)`: salva imagens/audio em `storage/uploads/<projectId>/`, registra `MediaFile` no banco e atualiza titulo/legenda do projeto.
 
-Na tela `/contents/[id]`, o botao `Gerar assets com Gemini` dispara esse fluxo. Se o modelo de imagem ou audio nao estiver disponivel para a chave usada, o sistema mantem o plano textual gerado e permite continuar com upload manual.
+Na tela `/contents/[id]`, o botao `Gerar assets com Gemini` ainda pode disparar esse fluxo diretamente. No fluxo assistido principal, a criacao em `/contents/new` tenta gerar assets por Manus quando configurada e usa Gemini como fallback quando necessario. Se imagem ou audio nao forem retornados, o sistema mantem o plano textual gerado e permite continuar com upload manual.
 
-Se a Gemini nao retornar imagens, o app tenta usar a Manus como fallback, criando uma task assíncrona via API e baixando anexos de imagem retornados em `task.listMessages`. Para habilitar:
+A Gemini atua como fallback quando a Manus nao estiver configurada ou nao conseguir entregar todos os assets. O fluxo principal e Manus-first, mantendo a Gemini como rede de seguranca para a geracao do plano textual, imagens e audio.
 
-```env
-MANUS_API_KEY="sua-chave-da-manus"
-```
+## Pipeline de IA e troubleshooting
 
-Tambem e possivel cadastrar a chave em `/settings`. A chave da Manus nunca deve ser colocada no codigo.
+Prioridade do fluxo de assets:
+
+Resumo operacional: Manus primary, Gemini fallback.
+
+1. Manus cria a task principal, registra status/task id e tenta retornar plano + anexos.
+2. Gemini atua como fallback/teste quando Manus nao esta configurada ou retorna resultado parcial.
+3. Se imagem ou audio nao forem gerados, o projeto preserva o plano textual e mostra orientacao para upload manual.
+
+Falhas comuns e acao recomendada:
+
+- Quota excedida: aguarde a janela do provedor ou troque a chave/modelo configurado.
+- Chave invalida: revise `MANUS_API_KEY`, `GEMINI_API_KEY` e as permissoes da conta.
+- Modelo indisponivel: tente novamente mais tarde ou ajuste a preferencia de modelo em `/settings`.
+- Anexos vazios: complete imagens/audio pelo upload manual antes de gerar o MP4.
+- Acao manual requerida: acesse a conta do provedor, resolva a solicitacao e rode novamente.
+
+Nunca exponha chaves em componentes de frontend, logs compartilhados ou commits.
 
 ## Agendamento
 

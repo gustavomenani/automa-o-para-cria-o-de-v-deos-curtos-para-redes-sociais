@@ -24,7 +24,8 @@ export default async function SettingsPage({
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Preferencias do sistema</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-            Prepare credenciais e padroes para a futura integracao com Manus e redes sociais.
+            Configure credenciais server-side para Manus e padroes usados na geracao de assets.
+            Quando a chave nao estiver disponivel, o fluxo tenta fallback sem expor segredos.
           </p>
         </div>
 
@@ -45,7 +46,8 @@ export default async function SettingsPage({
               <div>
                 <h2 className="font-semibold">Manus</h2>
                 <p className="mt-1 text-sm leading-6 text-zinc-500">
-                  Service mockado pronto para trocar pelo client real.
+                  Integracao real quando configurada; sem chave ou acesso, o sistema registra
+                  fallback e mantem upload manual.
                 </p>
               </div>
             </div>
@@ -98,13 +100,14 @@ export default async function SettingsPage({
                   type="password"
                   placeholder={
                     manusSettings.hasApiKey
-                      ? "Chave ja cadastrada. Preencha apenas para substituir."
-                      : "Cole a API key quando estiver disponivel."
+                      ? "Chave já cadastrada. Preencha apenas para substituir."
+                      : "Insira a chave da API da Manus."
                   }
                   className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm"
                 />
                 <p className="mt-2 text-xs leading-5 text-zinc-500">
-                  No MVP a chave fica salva no banco local. Depois pode ser movida para secret manager.
+                  A chave e usada somente no servidor. No MVP fica salva no banco local; em
+                  producao, mova para secret manager.
                 </p>
               </div>
 
