@@ -3,6 +3,7 @@ import {
   attachMediaFilesToProject,
   filesFromFormData,
 } from "@/features/content/services/upload-service";
+import { getCurrentUser } from "@/features/auth/session";
 import { apiCreated, apiError } from "@/lib/api-response";
 
 export const runtime = "nodejs";
@@ -12,6 +13,12 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return apiError(new Error("Faca login para acessar seus projetos."), "Nao autorizado.", 401);
+    }
+
     const { id } = await params;
     const formData = await request.formData();
     const audioFiles = filesFromFormData(formData, "audio");
@@ -20,10 +27,14 @@ export async function POST(
       return apiError(new Error("Envie apenas um arquivo de audio."), "Falha ao processar upload.");
     }
 
-    const mediaFiles = await attachMediaFilesToProject(id, {
-      images: filesFromFormData(formData, "images"),
-      audio: audioFiles[0],
-    });
+    const mediaFiles = await attachMediaFilesToProject(
+      id,
+      {
+        images: filesFromFormData(formData, "images"),
+        audio: audioFiles[0],
+      },
+      user.id,
+    );
 
     return apiCreated({ mediaFiles });
   } catch (error) {
