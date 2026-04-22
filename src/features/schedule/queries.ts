@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 
-export async function getScheduledPosts() {
+export async function getScheduledPosts(userId: string) {
   return prisma.scheduledPost.findMany({
+    where: { project: { userId } },
     include: {
       project: {
         include: {

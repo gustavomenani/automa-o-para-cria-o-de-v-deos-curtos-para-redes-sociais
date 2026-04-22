@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { DeleteContentButton } from "@/features/content/components/delete-content-button";
 import { getScheduledPosts } from "@/features/schedule/queries";
+import { requireUser } from "@/features/auth/session";
 import { formatDateTime } from "@/lib/formatters";
 import { toPublicFileUrl } from "@/lib/paths";
 
@@ -37,7 +38,8 @@ export default async function SchedulePage({
   searchParams: Promise<{ deleted?: string; scheduled?: string }>;
 }) {
   const feedback = await searchParams;
-  const scheduledPosts = await getScheduledPosts();
+  const user = await requireUser();
+  const scheduledPosts = await getScheduledPosts(user.id);
 
   return (
     <AppShell>
