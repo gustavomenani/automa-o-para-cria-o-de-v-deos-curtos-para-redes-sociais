@@ -7,10 +7,16 @@ export function CreateContentForm() {
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <section className="space-y-5 rounded-lg border border-stone-200 bg-white p-5">
           <div className="rounded-md border border-teal-100 bg-teal-50 p-4">
-            <p className="text-sm font-semibold text-teal-950">Fluxo automatico com Gemini</p>
+            <p className="text-sm font-semibold text-teal-950">
+              Fluxo automatico com Manus primeiro
+            </p>
             <p className="mt-2 text-sm leading-6 text-teal-900/80">
-              Preencha o prompt e clique em gerar com Gemini. O sistema cria roteiro,
-              legenda, imagens, audio e tenta montar o MP4 automaticamente.
+              Preencha o prompt e gere assets com Manus. Se a Manus nao estiver configurada
+              ou retornar resultado parcial, o sistema tenta Gemini como fallback e mantem o
+              upload manual disponivel.
+            </p>
+            <p className="mt-2 text-sm leading-6 text-teal-900/80">
+              As chaves ficam somente no servidor, configuradas via .env ou /settings.
             </p>
           </div>
 
@@ -87,7 +93,8 @@ export function CreateContentForm() {
               className="mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-2 file:text-sm file:font-medium"
             />
             <p className="mt-2 text-xs text-zinc-500">
-              Opcional no fluxo Gemini. Obrigatorio apenas para gerar video manualmente.
+              Opcional no fluxo de IA. Envie aqui se o provedor retornar plano textual sem
+              imagens suficientes.
             </p>
           </div>
 
@@ -103,7 +110,7 @@ export function CreateContentForm() {
               className="mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-2 file:text-sm file:font-medium"
             />
             <p className="mt-2 text-xs text-zinc-500">
-              Opcional no fluxo Gemini. MP3, WAV ou M4A para upload manual.
+              Opcional no fluxo de IA. MP3, WAV ou M4A para completar resultados sem audio.
             </p>
           </div>
         </section>
@@ -113,10 +120,10 @@ export function CreateContentForm() {
         <SubmitButton
           name="intent"
           value="gemini"
-          pendingLabel="Gerando com Gemini..."
+          pendingLabel="Gerando com IA..."
           icon="wand"
         >
-          Gerar tudo com Gemini
+          Gerar assets com Manus
         </SubmitButton>
         <SubmitButton
           name="intent"
@@ -134,7 +141,7 @@ export function CreateContentForm() {
           icon="wand"
           variant="secondary"
         >
-          Salvar e gerar com uploads
+          Salvar e completar com uploads
         </SubmitButton>
       </div>
     </form>
