@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import type { ProjectFilesInput } from "@/features/content/services/upload-service";
+import { storageRoot } from "@/lib/paths";
 
 export const MEDIA_LIMITS = {
   maxImages: 10,
@@ -107,7 +107,9 @@ function checkSize(file: File, total: number) {
 }
 
 async function defaultAudioDurationProbe(file: File) {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "media-probe-"));
+  const probeRoot = path.join(storageRoot, "tmp-probes");
+  await fs.mkdir(probeRoot, { recursive: true });
+  const tempDir = await fs.mkdtemp(path.join(probeRoot, "media-probe-"));
   const tempFile = path.join(tempDir, file.name || "audio.bin");
 
   try {
