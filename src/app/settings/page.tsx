@@ -4,6 +4,7 @@ import { FeedbackBanner } from "@/components/feedback-banner";
 import { SubmitButton } from "@/components/submit-button";
 import { saveManusSettingsAction } from "@/features/settings/actions";
 import { getManusSettings } from "@/features/settings/queries";
+import { requireUser } from "@/features/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,7 @@ export default async function SettingsPage({
   searchParams: Promise<{ saved?: string }>;
 }) {
   const feedback = await searchParams;
+  await requireUser();
   const manusSettings = await getManusSettings();
 
   return (

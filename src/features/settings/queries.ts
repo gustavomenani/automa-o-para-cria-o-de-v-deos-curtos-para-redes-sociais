@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/features/auth/session";
 
 type DefaultManusConfig = {
   durationSeconds?: number;
@@ -14,8 +15,9 @@ function getConfigValue(config: unknown): DefaultManusConfig {
 }
 
 export async function getManusSettings() {
-  const settings = await prisma.manusSettings.findFirst({
-    orderBy: { updatedAt: "desc" },
+  const user = await requireUser();
+  const settings = await prisma.manusSettings.findUnique({
+    where: { userId: user.id },
   });
 
   const reels = getConfigValue(settings?.defaultReelsConfig);
