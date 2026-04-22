@@ -18,7 +18,7 @@ O projeto esta entre Phase 1 e Phase 2:
 |---|-------|------|--------------|--------|
 | 1 | Stabilize Core MVP | Garantir que criar, subir midias, gerar video com legenda, revisar, baixar e agendar funcione de forma confiavel | CONT, MED, VID, CAP, REV, SCH basicos | In Progress |
 | 2 | AI Asset Pipeline | Consolidar prompt -> Manus/Gemini -> assets salvos -> video geravel | AI, CONT-02 | In Progress |
-| 3 | Product Hardening | Adicionar auth, limites, validacoes, testes e UX de erro/revisao | SEC, MED-04, SCH-04, OPS-05 | Pending |
+| 3 | Product Hardening | Adicionar auth, limites, validacoes, testes e UX de erro/revisao | SEC, MED-04, SCH-04, OPS-05 | Complete |
 | 4 | Worker, Queue and Deploy | Migrar tarefas longas para fila/worker e preparar VPS Docker | OPS, SCH-05, MED-05 | Pending |
 | 5 | Social Publishing and Assisted Export | Implementar adaptadores sociais e fallback de exportacao assistida | SOC, SCH publishing | Pending |
 
@@ -95,13 +95,13 @@ Plans:
 **Plans:** 7 plans
 
 Plans:
-- [ ] 03-01-PLAN.md - Create auth/session foundation and owner-aware settings schema.
-- [ ] 03-02-PLAN.md - Scope content pages and server actions by authenticated owner.
-- [ ] 03-03-PLAN.md - Protect API, file-serving, and settings surfaces.
-- [ ] 03-04-PLAN.md - Enforce upload limits, signatures, and audio duration validation.
-- [ ] 03-05-PLAN.md - Prevent concurrent video generation corruption.
-- [ ] 03-06-PLAN.md - Add caption review, schedule validation, and redacted errors.
-- [ ] 03-07-PLAN.md - Add the high-risk Phase 3 automated test net.
+- [x] 03-01-PLAN.md - Create auth/session foundation and owner-aware settings schema.
+- [x] 03-02-PLAN.md - Scope content pages and server actions by authenticated owner.
+- [x] 03-03-PLAN.md - Protect API, file-serving, and settings surfaces.
+- [x] 03-04-PLAN.md - Enforce upload limits, signatures, and audio duration validation.
+- [x] 03-05-PLAN.md - Prevent concurrent video generation corruption.
+- [x] 03-06-PLAN.md - Add caption review, schedule validation, and redacted errors.
+- [x] 03-07-PLAN.md - Add the high-risk Phase 3 automated test net.
 
 **What remains:**
 1. Add simple authentication and require session on all mutation/read routes.

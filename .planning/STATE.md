@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: human_verification_needed
-last_updated: "2026-04-22T21:07:55.832Z"
+status: Ready to plan
+last_updated: "2026-04-22T21:46:15.194Z"
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 3
+  total_plans: 13
+  completed_plans: 13
   percent: 100
 ---
 
@@ -20,17 +20,18 @@ progress:
 
 ## Current Focus
 
-Phase 2: AI Asset Pipeline human validation.
+Phase 4: Worker, Queue and Deploy planning readiness.
 
-Phase 2 plan execution is complete and automated verification passed. The remaining checkpoint is a browser/provider UAT run for prompt-based generation with partial or missing media, recorded in `.planning/phases/02-ai-asset-pipeline/02-HUMAN-UAT.md`.
+Phase 3 Product Hardening is complete and automated verification passed. The remaining human validation is a browser UAT pass for login bootstrap, owner boundaries, upload rejection, generation locked state, caption review, and schedule validation, recorded in `.planning/phases/03-product-hardening/03-VERIFICATION.md`.
 
 ## Planning Status
 
 - **Phase 1**: Planned and verified.
 - **Phase 2**: Executed; automated verification passed; human UAT pending.
-- **Plan count (Phase 2)**: 3 plans in 3 waves.
-- **Plan directory (Phase 2)**: .planning/phases/02-ai-asset-pipeline/
-- **Verification**: `02-VERIFICATION.md` status is `human_needed`.
+- **Phase 3**: Executed; automated verification passed with one advisory build warning.
+- **Plan count (Phase 3)**: 7 plans in 5 waves.
+- **Plan directory (Phase 3)**: .planning/phases/03-product-hardening/
+- **Verification**: `03-VERIFICATION.md` status is `passed`.
 
 ## Current Codebase Map
 
@@ -60,6 +61,13 @@ See `.planning/codebase/`:
 - Gemini integration for test asset generation.
 - Manus integration structure and partial real API/fallback behavior.
 - Social publishing interface stub.
+- Simple local login with signed httpOnly session cookie.
+- Owner-scoped content pages, Server Actions, APIs, file downloads, schedules and Manus settings.
+- Upload signature, size, count and audio duration validation before storage writes.
+- Project-level generation lock with per-run generated video output paths.
+- Caption review form for uncertain synchronization.
+- Redacted user-facing API/action errors.
+- Vitest coverage for Phase 3 hardening logic.
 
 ## What Is In Progress
 
@@ -73,15 +81,13 @@ These files currently have uncommitted local changes and should be handled caref
 ## Main Gaps
 
 1. Subtitle pipeline still needs robust, repeatable synchronization.
-2. No auth/session enforcement despite `User` model.
-3. No queue/worker; long IA/Whisper/FFmpeg jobs run inside request/action paths.
-4. No Redis/BullMQ scheduler worker yet.
-5. No real social publisher implementation.
-6. No Story-specific generation/review path.
-7. No automated tests.
-8. Upload validation lacks size/signature/duration limits.
-9. Local filesystem storage is not production-safe for multi-instance or ephemeral deploy.
-10. Phase 2 provider behavior still needs live Manus/Gemini UAT for partial and manual-action outcomes.
+2. No queue/worker; long IA/Whisper/FFmpeg jobs run inside request/action paths.
+3. No Redis/BullMQ scheduler worker yet.
+4. No real social publisher implementation.
+5. No Story-specific generation/review path.
+6. Local filesystem storage is not production-safe for multi-instance or ephemeral deploy.
+7. Phase 2 provider behavior still needs live Manus/Gemini UAT for partial and manual-action outcomes.
+8. Phase 3 auth/upload/generation/schedule hardening needs browser UAT with configured local credentials.
 
 ## Working Tree Note
 
@@ -95,7 +101,7 @@ Do not revert them blindly; they are part of the ongoing subtitle work.
 
 ## Next Recommended Command
 
-Validate `.planning/phases/02-ai-asset-pipeline/02-HUMAN-UAT.md` with a live or fixture-backed prompt run.
+Run Phase 3 browser UAT from `.planning/phases/03-product-hardening/03-VERIFICATION.md`, then start Phase 4 planning for queue/worker/deploy.
 
 ---
-*Last updated: 2026-04-22 after Phase 2 execution*
+*Last updated: 2026-04-22 after Phase 3 execution*

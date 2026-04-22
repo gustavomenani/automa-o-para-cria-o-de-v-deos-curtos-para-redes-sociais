@@ -18,7 +18,7 @@
 - [ ] **MED-01**: Sistema salva imagens e audio em `storage/uploads/<projectId>/` no MVP.
 - [ ] **MED-02**: Sistema registra metadados de imagens, audio, legendas e video no banco via Prisma.
 - [ ] **MED-03**: Sistema valida tipos de arquivo aceitos e rejeita formatos invalidos.
-- [ ] **MED-04**: Sistema aplica limites de tamanho, quantidade e duracao antes de processar midias.
+- [x] **MED-04**: Sistema aplica limites de tamanho, quantidade e duracao antes de processar midias.
 - [ ] **MED-05**: Sistema prepara contrato de storage para futura migracao a S3/R2 sem reescrever regras de negocio.
 
 ### AI Assets
@@ -36,7 +36,7 @@
 - [ ] **VID-03**: Sistema sincroniza cenas com a duracao real do audio via ffprobe.
 - [ ] **VID-04**: Sistema exporta MP4 com H.264/AAC ou formato compativel com redes sociais.
 - [ ] **VID-05**: Sistema salva videos gerados em `storage/generated/` e registra `GeneratedVideo`.
-- [ ] **VID-06**: Sistema evita corrupcao em geracoes concorrentes para o mesmo projeto.
+- [x] **VID-06**: Sistema evita corrupcao em geracoes concorrentes para o mesmo projeto.
 
 ### Captions
 
@@ -45,21 +45,21 @@
 - [ ] **CAP-03**: Sistema preserva texto correto do roteiro/caption original sem inventar palavras.
 - [ ] **CAP-04**: Sistema evita delay perceptivel entre fala e legenda.
 - [ ] **CAP-05**: Sistema cai para sincronizacao aproximada quando Whisper falha, avisando o usuario quando a qualidade for incerta.
-- [ ] **CAP-06**: Sistema permite revisar manualmente texto/legenda antes da geracao final quando houver baixa confianca.
+- [x] **CAP-06**: Sistema permite revisar manualmente texto/legenda antes da geracao final quando houver baixa confianca.
 
 ### Review
 
 - [ ] **REV-01**: Usuario pode revisar titulo, prompt, status, imagens, audio, legenda e video gerado.
 - [ ] **REV-02**: Usuario pode baixar o video final.
 - [ ] **REV-03**: Usuario pode gerar novamente o video.
-- [ ] **REV-04**: Usuario ve erros e avisos de forma clara sem detalhes internos sensiveis.
+- [x] **REV-04**: Usuario ve erros e avisos de forma clara sem detalhes internos sensiveis.
 
 ### Scheduling
 
 - [ ] **SCH-01**: Usuario pode escolher plataforma, data, horario e caption para agendar.
 - [ ] **SCH-02**: Sistema salva `ScheduledPost` no banco e mostra todos os agendamentos em `/schedule`.
 - [ ] **SCH-03**: Sistema mostra "Pronto para postar" quando `scheduledAt <= now` e ainda nao houve publicacao.
-- [ ] **SCH-04**: Sistema valida que agendamentos novos nao sejam salvos no passado.
+- [x] **SCH-04**: Sistema valida que agendamentos novos nao sejam salvos no passado.
 - [ ] **SCH-05**: Sistema executa agendamentos via fila/worker quando a publicacao automatica estiver configurada.
 
 ### Social
@@ -75,14 +75,14 @@
 - [ ] **OPS-02**: Sistema tem caminho de deploy em VPS com Docker, FFmpeg, Python/Whisper e storage persistente.
 - [ ] **OPS-03**: Sistema usa fila/worker para IA, transcricao, renderizacao e publicacao.
 - [ ] **OPS-04**: Sistema registra logs estruturados de jobs sem expor segredos.
-- [ ] **OPS-05**: Sistema tem testes automatizados para os fluxos de maior risco.
+- [x] **OPS-05**: Sistema tem testes automatizados para os fluxos de maior risco.
 
 ### Security
 
-- [ ] **SEC-01**: Sistema possui login simples antes de ficar publico.
-- [ ] **SEC-02**: Sistema restringe projetos, arquivos e agendamentos ao usuario dono.
-- [ ] **SEC-03**: Sistema protege rotas de mutacao contra abuso com autenticacao e limites basicos.
-- [ ] **SEC-04**: Sistema armazena tokens/chaves sensiveis fora do codigo e evita renderizar valores secretos.
+- [x] **SEC-01**: Sistema possui login simples antes de ficar publico.
+- [x] **SEC-02**: Sistema restringe projetos, arquivos e agendamentos ao usuario dono.
+- [x] **SEC-03**: Sistema protege rotas de mutacao contra abuso com autenticacao e limites basicos.
+- [x] **SEC-04**: Sistema armazena tokens/chaves sensiveis fora do codigo e evita renderizar valores secretos.
 
 ## v2 Requirements
 
@@ -118,7 +118,7 @@
 | MED-01 | Phase 1 | Existing |
 | MED-02 | Phase 1 | Existing |
 | MED-03 | Phase 1 | Existing, needs hardening |
-| MED-04 | Phase 3 | Pending |
+| MED-04 | Phase 3 | Complete |
 | MED-05 | Phase 4 | Pending |
 | AI-01 | Phase 2 | In Progress |
 | AI-02 | Phase 2 | In Progress |
@@ -130,21 +130,21 @@
 | VID-03 | Phase 1 | Existing |
 | VID-04 | Phase 1 | Existing |
 | VID-05 | Phase 1 | Existing |
-| VID-06 | Phase 3 | Pending |
+| VID-06 | Phase 3 | Complete |
 | CAP-01 | Phase 1 | Existing |
 | CAP-02 | Phase 1 | In Progress |
 | CAP-03 | Phase 1 | In Progress |
 | CAP-04 | Phase 1 | In Progress |
 | CAP-05 | Phase 1 | Pending |
-| CAP-06 | Phase 3 | Pending |
+| CAP-06 | Phase 3 | Complete |
 | REV-01 | Phase 1 | Existing |
 | REV-02 | Phase 1 | Existing |
 | REV-03 | Phase 1 | Existing |
-| REV-04 | Phase 3 | Pending |
+| REV-04 | Phase 3 | Complete |
 | SCH-01 | Phase 1 | Existing |
 | SCH-02 | Phase 1 | Existing |
 | SCH-03 | Phase 1 | Existing |
-| SCH-04 | Phase 3 | Pending |
+| SCH-04 | Phase 3 | Complete |
 | SCH-05 | Phase 4 | Pending |
 | SOC-01 | Phase 5 | Pending |
 | SOC-02 | Phase 5 | Pending |
@@ -154,11 +154,11 @@
 | OPS-02 | Phase 4 | Pending |
 | OPS-03 | Phase 4 | Pending |
 | OPS-04 | Phase 4 | Pending |
-| OPS-05 | Phase 3 | Pending |
-| SEC-01 | Phase 3 | Pending |
-| SEC-02 | Phase 3 | Pending |
-| SEC-03 | Phase 3 | Pending |
-| SEC-04 | Phase 3 | In Progress |
+| OPS-05 | Phase 3 | Complete |
+| SEC-01 | Phase 3 | Complete |
+| SEC-02 | Phase 3 | Complete |
+| SEC-03 | Phase 3 | Complete |
+| SEC-04 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 47 total
