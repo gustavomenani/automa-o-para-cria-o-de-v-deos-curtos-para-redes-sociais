@@ -15,6 +15,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { DeleteContentButton } from "@/features/content/components/delete-content-button";
 import { GenerateVideoButton } from "@/features/content/components/generate-video-button";
 import { generateContentVideoAction } from "@/features/content/actions";
+import { requireUser } from "@/features/auth/session";
 import {
   formatAssetRunStatus,
   formatProviderName,
@@ -67,7 +68,8 @@ export default async function ContentDetailsPage({
 }) {
   const { id } = await params;
   const feedback = await searchParams;
-  const content = await getContentById(id);
+  const user = await requireUser();
+  const content = await getContentById(id, user.id);
 
   if (!content) {
     notFound();

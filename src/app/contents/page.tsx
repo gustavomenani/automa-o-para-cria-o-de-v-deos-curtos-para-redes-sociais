@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { ContentList } from "@/features/content/components/content-list";
 import { getContents } from "@/features/content/queries";
+import { requireUser } from "@/features/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,8 @@ export default async function ContentsPage({
   searchParams: Promise<{ deleted?: string }>;
 }) {
   const feedback = await searchParams;
-  const contents = await getContents();
+  const user = await requireUser();
+  const contents = await getContents(user.id);
 
   return (
     <AppShell>

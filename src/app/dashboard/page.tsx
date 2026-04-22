@@ -3,11 +3,13 @@ import { CheckCircle2, Clock3, FileVideo, PlusCircle, XCircle } from "lucide-rea
 import { AppShell } from "@/components/app-shell";
 import { ContentList } from "@/features/content/components/content-list";
 import { getDashboardStats } from "@/features/content/queries";
+import { requireUser } from "@/features/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const stats = await getDashboardStats();
+  const user = await requireUser();
+  const stats = await getDashboardStats(user.id);
 
   const metricItems = [
     { label: "Total", value: stats.total, icon: FileVideo },
