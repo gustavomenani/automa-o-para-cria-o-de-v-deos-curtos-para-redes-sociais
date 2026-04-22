@@ -80,6 +80,11 @@ export function CreateContentForm() {
         </section>
 
         <section className="space-y-5 rounded-lg border border-stone-200 bg-white p-5">
+          <p className="rounded-md bg-stone-50 p-3 text-xs leading-5 text-zinc-600">
+            Aceitamos PNG, JPG ou WebP para imagens e MP3, WAV ou M4A para audio, dentro dos
+            limites do sistema.
+          </p>
+
           <div>
             <label htmlFor="images" className="text-sm font-medium text-zinc-800">
               Imagens
