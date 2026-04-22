@@ -80,6 +80,7 @@ export default async function ContentDetailsPage({
   const generatedVideo = content.generatedVideos.at(0);
   const videoPath = generatedVideo?.path;
   const videoUrl = videoPath ? toPublicFileUrl(videoPath) : null;
+  const isGenerationLocked = content.status === "PROCESSING";
   const today = getLocalDateInputValue(new Date());
   const geminiPlan = await readStoredGeminiPlan(content.id);
   const latestRun = content.assetGenerationRuns.at(0);
@@ -174,6 +175,14 @@ export default async function ContentDetailsPage({
             type={content.status === "ERROR" ? "error" : "info"}
             title={content.status === "ERROR" ? "Geracao com erro" : "Revise a legenda"}
             message={contentErrorMessage}
+          />
+        ) : null}
+
+        {isGenerationLocked ? (
+          <FeedbackBanner
+            type="info"
+            title="Geracao em andamento"
+            message="Ja existe uma geracao em andamento para este projeto. Aguarde a conclusao antes de tentar novamente."
           />
         ) : null}
 
@@ -283,7 +292,7 @@ export default async function ContentDetailsPage({
                 Agendar postagem
               </Link>
               <form action={generateContentVideoAction.bind(null, content.id)}>
-                <GenerateVideoButton hasVideo={Boolean(videoUrl)} />
+                <GenerateVideoButton hasVideo={Boolean(videoUrl)} locked={isGenerationLocked} />
               </form>
               <DeleteContentButton contentId={content.id} />
             </div>
