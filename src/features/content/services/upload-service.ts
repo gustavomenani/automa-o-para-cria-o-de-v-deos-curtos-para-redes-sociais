@@ -9,20 +9,7 @@ import {
   contentProjectInputSchema,
   type ContentProjectInput,
 } from "@/features/content/schemas";
-
-const imageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
-const audioMimeTypes = new Set([
-  "audio/aac",
-  "audio/m4a",
-  "audio/mpeg",
-  "audio/mp3",
-  "audio/mp4",
-  "audio/ogg",
-  "audio/wav",
-  "audio/webm",
-  "audio/x-m4a",
-  "audio/x-wav",
-]);
+import { validateMediaFiles } from "@/features/content/services/media-validation";
 
 export type ProjectFilesInput = {
   images: File[];
@@ -48,36 +35,6 @@ function getFileFormat(fileName: string, mimeType: string) {
   return mimeType.split("/").at(1)?.toLowerCase() ?? "bin";
 }
 
-function validateFileType(file: File, expected: "image" | "audio") {
-  const allowed = expected === "image" ? imageMimeTypes : audioMimeTypes;
-
-  if (!allowed.has(file.type)) {
-    throw new Error(
-      expected === "image"
-        ? `Imagem invalida: ${file.name}. Use JPG, PNG ou WEBP.`
-        : `Audio invalido: ${file.name}. Use MP3, WAV, M4A, AAC, OGG ou WEBM.`,
-    );
-  }
-}
-
-export function validateProjectFiles(files: ProjectFilesInput, options = { requireAudio: true }) {
-  if (files.images.length === 0 && !files.audio) {
-    throw new Error("Envie pelo menos uma imagem ou um audio.");
-  }
-
-  for (const image of files.images) {
-    validateFileType(image, "image");
-  }
-
-  if (options.requireAudio && !files.audio) {
-    throw new Error("Envie um arquivo de audio.");
-  }
-
-  if (files.audio) {
-    validateFileType(files.audio, "audio");
-  }
-}
-
 function mediaData(projectId: string, type: "IMAGE" | "AUDIO", storedFile: StoredFile) {
   return {
     projectId,
@@ -95,7 +52,7 @@ export async function attachMediaFilesToProject(
   files: ProjectFilesInput,
   userId?: string,
 ) {
-  validateProjectFiles(files, { requireAudio: false });
+  await validateMediaFiles(files, { requireAudio: false });
 
   const project = await prisma.contentProject.findFirst({
     where: { id: projectId, ...(userId ? { userId } : {}) },
@@ -149,7 +106,7 @@ export async function createProjectWithUploads(
   userId?: string,
 ) {
   const parsed = contentProjectInputSchema.parse(input);
-  validateProjectFiles(files);
+  await validateMediaFiles(files);
 
   const project = await createContentProject(parsed, userId);
 
