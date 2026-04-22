@@ -39,6 +39,7 @@ completed: 2026-04-22
 1. **Task 1:** `5626a8e` add media validation coverage
 2. **Task 2:** `d3a08e3` enforce media validation before storage
 3. **Task 3:** `d57f6a3` show upload limit guidance
+4. **Follow-up fix:** `468890d` scope media probe temp files
 
 ## Verification
 
@@ -52,6 +53,7 @@ None - plan executed exactly as written.
 ## Issues Encountered
 
 - `next build` reports an advisory Turbopack NFT tracing warning for `media-validation.ts` imported by upload route handlers. Build exits 0; tracked as verification warning.
+- Probe temp files were scoped under `storage/tmp-probes` in `468890d`; the Turbopack warning remains advisory.
 
 ## Self-Check: PASSED
 

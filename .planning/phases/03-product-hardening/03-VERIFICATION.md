@@ -13,7 +13,7 @@ verified: 2026-04-22
 | `npm run prisma:generate` | passed | Prisma Client generated after schema changes. |
 | `npm test` | passed | 8 test files, 29 tests. |
 | `npm run lint` | passed | ESLint completed without errors. |
-| `npm run build` | passed_with_warning | Build exits 0; Turbopack reports an advisory NFT tracing warning for `media-validation.ts` imported by upload routes. |
+| `npm run build` | passed_with_warning | Build exits 0; Turbopack reports an advisory NFT tracing warning for `media-validation.ts` imported by upload routes, even after probe temp files were scoped under `storage/tmp-probes`. |
 
 ## Must-Have Coverage
 
