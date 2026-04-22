@@ -125,6 +125,14 @@ Plans:
 **UI hint:** no
 
 **Requirements:** MED-05, SCH-05, OPS-02, OPS-03, OPS-04
+**Plans:** 5 plans
+
+Plans:
+- [ ] 04-01-PLAN.md - Create BullMQ/Redis queue contracts and Prisma-backed job status/log persistence.
+- [ ] 04-02-PLAN.md - Add the separate worker process and handlers for AI, video, and scheduled jobs.
+- [ ] 04-03-PLAN.md - Enqueue web flows and surface status/retry controls in content and schedule screens.
+- [ ] 04-04-PLAN.md - Add the local storage contract for future S3/R2 migration.
+- [ ] 04-05-PLAN.md - Prepare Docker/VPS deployment with Redis, worker, media volumes, FFmpeg, and Python.
 
 **What remains:**
 1. Add Redis/BullMQ or equivalent queue.
