@@ -10,7 +10,6 @@ import {
 describe("asset run display helpers", () => {
   it("formats provider and run status labels for user-facing UI", () => {
     expect(formatProviderName("MANUS")).toBe("Manus");
-    expect(formatProviderName("GEMINI")).toBe("Gemini");
     expect(formatAssetRunStatus("MANUAL_ACTION_REQUIRED")).toBe("acao manual requerida");
     expect(formatAssetRunStatus("PARTIAL")).toBe("partial");
   });

@@ -23,7 +23,7 @@ function looksSensitive(message: string) {
     /\b(ffmpeg|ffprobe|stderr|stdout|spawn|traceback|stack|node_modules|libx264|sql|prisma)\b/i.test(message) ||
     /\bat\s+\S+\s+\(/.test(message) ||
     /([A-Z]:\\|\/Users\/|\/home\/|storage[\\/]|\.env|request headers?)/i.test(message) ||
-    /(AIza[0-9A-Za-z_-]{20,}|MANUS_API_KEY|GEMINI_API_KEY|SESSION_SECRET|sk-[0-9A-Za-z_-]{20,})/.test(message)
+    /(MANUS_API_KEY|SESSION_SECRET|sk-[0-9A-Za-z_-]{20,})/.test(message)
   );
 }
 

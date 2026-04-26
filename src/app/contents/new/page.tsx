@@ -2,14 +2,44 @@ import { AppShell } from "@/components/app-shell";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { CreateContentForm } from "@/features/content/components/create-content-form";
 import { requireUser } from "@/features/auth/session";
+import { prisma } from "@/lib/prisma";
+import { getManusSettings } from "@/features/settings/queries";
+
+function decodeFeedbackMessage(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
 export default async function NewContentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; duplicate?: string; mode?: "manus" | "manual" }>;
 }) {
   const feedback = await searchParams;
-  await requireUser();
+  const errorMessage = decodeFeedbackMessage(feedback.error);
+  const user = await requireUser();
+  const manusSettings = await getManusSettings();
+  const duplicatedProject = feedback.duplicate
+    ? await prisma.contentProject.findFirst({
+        where: {
+          id: feedback.duplicate,
+          userId: user.id,
+        },
+        select: {
+          title: true,
+          prompt: true,
+          caption: true,
+          contentType: true,
+        },
+      })
+    : null;
 
   return (
     <AppShell>
@@ -23,14 +53,34 @@ export default async function NewContentPage({
             Digite um prompt para a Manus gerar roteiro, legenda, imagens e audio, ou use uploads manuais se preferir.
           </p>
         </div>
-        {feedback.error ? (
+        {errorMessage ? (
           <FeedbackBanner
             type="error"
             title="Nao foi possivel criar o conteudo"
-            message={decodeURIComponent(feedback.error)}
+            message={errorMessage}
           />
         ) : null}
-        <CreateContentForm />
+        <CreateContentForm
+          defaults={
+            duplicatedProject
+              ? {
+                  title: `${duplicatedProject.title} copia`,
+                  prompt: duplicatedProject.prompt,
+                  caption: duplicatedProject.caption ?? "",
+                  contentType: duplicatedProject.contentType,
+                  mode: feedback.mode,
+                }
+              : {
+                  mode: feedback.mode,
+                }
+          }
+          recommendations={{
+            reelsDuration: manusSettings.reelsDuration,
+            reelsStyle: manusSettings.reelsStyle,
+            storiesDuration: manusSettings.storiesDuration,
+            storiesStyle: manusSettings.storiesStyle,
+          }}
+        />
       </div>
     </AppShell>
   );

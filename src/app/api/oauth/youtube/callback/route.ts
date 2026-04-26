@@ -47,60 +47,55 @@ export async function GET(request: Request) {
     const origin = url.origin;
     const tokens = await exchangeYouTubeCodeForTokens({ code, origin });
     const profile = await fetchGoogleUserProfile(tokens.accessToken);
-
-    await prisma.socialAccount.upsert({
+    const accountName = profile.email || profile.name || "YouTube";
+    const existingAccount = await prisma.socialAccount.findFirst({
       where: {
-        userId_platform_accountName: {
-          userId: user.id,
-          platform: "YOUTUBE",
-          accountName: profile.email || profile.name || "YouTube",
-        },
-      },
-      update: {
-        externalId: profile.sub,
-        accountName: profile.email || profile.name || "YouTube",
-        providerAccountType: "google_oauth",
-        accessTokenCiphertext: storeEncryptedToken(tokens.accessToken),
-        refreshTokenCiphertext: tokens.refreshToken
-          ? storeEncryptedToken(tokens.refreshToken)
-          : undefined,
-        tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scopes,
-        providerMetadata: {
-          email: profile.email ?? null,
-          name: profile.name ?? null,
-          picture: profile.picture ?? null,
-        },
-        status: "active",
-        reauthRequired: false,
-        tokenErrorMessage: null,
-        lastValidatedAt: new Date(),
-        isActive: true,
-      },
-      create: {
         userId: user.id,
         platform: "YOUTUBE",
-        accountName: profile.email || profile.name || "YouTube",
-        externalId: profile.sub,
-        providerAccountType: "google_oauth",
-        accessTokenCiphertext: storeEncryptedToken(tokens.accessToken),
-        refreshTokenCiphertext: tokens.refreshToken
-          ? storeEncryptedToken(tokens.refreshToken)
-          : null,
-        tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scopes,
-        providerMetadata: {
-          email: profile.email ?? null,
-          name: profile.name ?? null,
-          picture: profile.picture ?? null,
-        },
-        status: "active",
-        reauthRequired: false,
-        tokenErrorMessage: null,
-        lastValidatedAt: new Date(),
-        isActive: true,
+        OR: [
+          { externalId: profile.sub },
+          { accountName },
+        ],
       },
+      select: { id: true },
     });
+
+    const data = {
+      externalId: profile.sub,
+      accountName,
+      providerAccountType: "google_oauth",
+      accessTokenCiphertext: storeEncryptedToken(tokens.accessToken),
+      refreshTokenCiphertext: tokens.refreshToken
+        ? storeEncryptedToken(tokens.refreshToken)
+        : null,
+      tokenExpiresAt: tokens.expiresAt,
+      scopes: tokens.scopes,
+      providerMetadata: {
+        email: profile.email ?? null,
+        name: profile.name ?? null,
+        picture: profile.picture ?? null,
+      },
+      status: "active",
+      reauthRequired: false,
+      tokenErrorMessage: null,
+      lastValidatedAt: new Date(),
+      isActive: true,
+    } as const;
+
+    if (existingAccount) {
+      await prisma.socialAccount.update({
+        where: { id: existingAccount.id },
+        data,
+      });
+    } else {
+      await prisma.socialAccount.create({
+        data: {
+          userId: user.id,
+          platform: "YOUTUBE",
+          ...data,
+        },
+      });
+    }
 
     return NextResponse.redirect(new URL("/settings?youtubeConnected=1", request.url));
   } catch (callbackError) {

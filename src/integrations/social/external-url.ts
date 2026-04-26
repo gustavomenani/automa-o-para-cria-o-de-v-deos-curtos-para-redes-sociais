@@ -1,3 +1,4 @@
+import { createFileAccessToken } from "@/lib/file-access-token";
 import { toPublicFileUrl } from "@/lib/paths";
 
 function stripTrailingSlash(value: string) {
@@ -37,5 +38,9 @@ export function getExternalMediaBaseUrl() {
 
 export function getExternallyReachableFileUrl(filePath: string) {
   const baseUrl = getExternalMediaBaseUrl();
-  return `${baseUrl}${toPublicFileUrl(filePath)}`;
+  const publicPath = toPublicFileUrl(filePath);
+  const relativePath = publicPath.replace(/^\/api\/files\//, "");
+  const accessToken = createFileAccessToken(relativePath);
+
+  return `${baseUrl}${publicPath}?access=${encodeURIComponent(accessToken)}`;
 }

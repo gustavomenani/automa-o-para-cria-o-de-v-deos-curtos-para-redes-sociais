@@ -1,8 +1,4 @@
 import { NextRequest } from "next/server";
-import {
-  createProjectWithUploads,
-  parseProjectFormData,
-} from "@/features/content/services/upload-service";
 import { getCurrentUser } from "@/features/auth/session";
 import { apiCreated, apiError } from "@/lib/api-response";
 
@@ -17,6 +13,9 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
+    const { createProjectWithUploads, parseProjectFormData } = await import(
+      "@/features/content/services/upload-service"
+    );
     const { input, files } = parseProjectFormData(formData);
     const project = await createProjectWithUploads(input, files, user.id);
 

@@ -39,52 +39,50 @@ export async function GET(request: Request) {
     const origin = url.origin;
     const tokens = await exchangeInstagramCodeForTokens({ code, origin });
     const profile = await fetchInstagramProfile(tokens.accessToken);
-
-    await prisma.socialAccount.upsert({
+    const existingAccount = await prisma.socialAccount.findFirst({
       where: {
-        userId_platform_accountName: {
-          userId: user.id,
-          platform: "INSTAGRAM",
-          accountName: profile.username,
-        },
-      },
-      update: {
-        externalId: profile.user_id,
-        accountName: profile.username,
-        providerAccountType: "instagram_login",
-        accessTokenCiphertext: storeEncryptedToken(tokens.accessToken),
-        refreshTokenCiphertext: storeEncryptedToken(tokens.refreshToken),
-        tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scopes,
-        providerMetadata: {
-          username: profile.username,
-        },
-        status: "active",
-        reauthRequired: false,
-        tokenErrorMessage: null,
-        lastValidatedAt: new Date(),
-        isActive: true,
-      },
-      create: {
         userId: user.id,
         platform: "INSTAGRAM",
-        accountName: profile.username,
-        externalId: profile.user_id,
-        providerAccountType: "instagram_login",
-        accessTokenCiphertext: storeEncryptedToken(tokens.accessToken),
-        refreshTokenCiphertext: storeEncryptedToken(tokens.refreshToken),
-        tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scopes,
-        providerMetadata: {
-          username: profile.username,
-        },
-        status: "active",
-        reauthRequired: false,
-        tokenErrorMessage: null,
-        lastValidatedAt: new Date(),
-        isActive: true,
+        OR: [
+          { externalId: profile.user_id },
+          { accountName: profile.username },
+        ],
       },
+      select: { id: true },
     });
+
+    const data = {
+      externalId: profile.user_id,
+      accountName: profile.username,
+      providerAccountType: "instagram_login",
+      accessTokenCiphertext: storeEncryptedToken(tokens.accessToken),
+      refreshTokenCiphertext: storeEncryptedToken(tokens.refreshToken),
+      tokenExpiresAt: tokens.expiresAt,
+      scopes: tokens.scopes,
+      providerMetadata: {
+        username: profile.username,
+      },
+      status: "active",
+      reauthRequired: false,
+      tokenErrorMessage: null,
+      lastValidatedAt: new Date(),
+      isActive: true,
+    } as const;
+
+    if (existingAccount) {
+      await prisma.socialAccount.update({
+        where: { id: existingAccount.id },
+        data,
+      });
+    } else {
+      await prisma.socialAccount.create({
+        data: {
+          userId: user.id,
+          platform: "INSTAGRAM",
+          ...data,
+        },
+      });
+    }
 
     return NextResponse.redirect(new URL("/settings?instagramConnected=1", request.url));
   } catch (callbackError) {

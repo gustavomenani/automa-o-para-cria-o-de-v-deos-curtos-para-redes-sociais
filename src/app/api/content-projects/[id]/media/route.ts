@@ -1,8 +1,4 @@
 import { NextRequest } from "next/server";
-import {
-  attachMediaFilesToProject,
-  filesFromFormData,
-} from "@/features/content/services/upload-service";
 import { getCurrentUser } from "@/features/auth/session";
 import { apiCreated, apiError } from "@/lib/api-response";
 
@@ -21,6 +17,9 @@ export async function POST(
 
     const { id } = await params;
     const formData = await request.formData();
+    const { attachMediaFilesToProject, filesFromFormData } = await import(
+      "@/features/content/services/upload-service"
+    );
     const audioFiles = filesFromFormData(formData, "audio");
 
     if (audioFiles.length > 1) {

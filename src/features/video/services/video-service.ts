@@ -17,6 +17,7 @@ import {
   transcriptionService,
   type TranscriptionSegment,
 } from "@/features/video/services/transcription-service";
+import { readStoredManusPlan } from "@/integrations/manus/manus-service";
 import { prisma } from "@/lib/prisma";
 import { getGeneratedVideoPath } from "@/lib/storage/local-storage";
 
@@ -59,7 +60,8 @@ function getFfprobePath() {
     (ffmpegPath.includes("/") || ffmpegPath.includes("\\")) &&
     path.basename(ffmpegPath).toLowerCase().startsWith("ffmpeg")
   ) {
-    return path.join(path.dirname(ffmpegPath), "ffprobe.exe");
+    const ffprobeBinary = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
+    return path.join(path.dirname(ffmpegPath), ffprobeBinary);
   }
 
   return "ffprobe";
@@ -178,10 +180,15 @@ export class VideoService {
       throw new Error("Projeto nao encontrado.");
     }
 
-    const imagePaths = project.mediaFiles
+    const orderedMediaFiles = [...project.mediaFiles].sort(
+      (left, right) => left.createdAt.getTime() - right.createdAt.getTime(),
+    );
+    const imagePaths = orderedMediaFiles
       .filter((file) => file.type === "IMAGE")
       .map((file) => file.path);
-    const audioPath = project.mediaFiles.find((file) => file.type === "AUDIO")?.path;
+    const audioPath = [...orderedMediaFiles]
+      .reverse()
+      .find((file) => file.type === "AUDIO")?.path;
 
     let generatedVideoId: string | null = null;
 
@@ -309,19 +316,8 @@ export class VideoService {
   }
 
   private async getProjectCaptionText(projectId: string) {
-    const planPath = path.join(process.cwd(), "storage", "uploads", projectId, "manus-plan.json");
-
-    try {
-      const plan = JSON.parse(await fs.readFile(planPath, "utf8")) as {
-        script?: unknown;
-      };
-
-      return typeof plan.script === "string" && plan.script.trim()
-        ? plan.script
-        : null;
-    } catch {
-      return null;
-    }
+    const plan = await readStoredManusPlan(projectId);
+    return typeof plan?.script === "string" && plan.script.trim() ? plan.script : null;
   }
 
   private async generateVerticalMp4(

@@ -53,58 +53,53 @@ export async function GET(request: Request) {
     const accountName =
       creatorInfo.creator_username || creatorInfo.creator_nickname || "TikTok";
     const externalId = tokens.openId || creatorInfo.creator_username || accountName;
-
-    await prisma.socialAccount.upsert({
+    const existingAccount = await prisma.socialAccount.findFirst({
       where: {
-        userId_platform_accountName: {
-          userId: user.id,
-          platform: "TIKTOK",
-          accountName,
-        },
-      },
-      update: {
-        externalId,
-        accountName,
-        providerAccountType: "tiktok_oauth",
-        accessTokenCiphertext: storeEncryptedToken(tokens.accessToken),
-        refreshTokenCiphertext: storeEncryptedToken(tokens.refreshToken),
-        tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scopes.length ? tokens.scopes : getTikTokScopes(),
-        providerMetadata: {
-          username: creatorInfo.creator_username ?? null,
-          nickname: creatorInfo.creator_nickname ?? null,
-          avatarUrl: creatorInfo.creator_avatar_url ?? null,
-          privacyLevelOptions: creatorInfo.privacy_level_options ?? [],
-        },
-        status: "active",
-        reauthRequired: false,
-        tokenErrorMessage: null,
-        lastValidatedAt: new Date(),
-        isActive: true,
-      },
-      create: {
         userId: user.id,
         platform: "TIKTOK",
-        accountName,
-        externalId,
-        providerAccountType: "tiktok_oauth",
-        accessTokenCiphertext: storeEncryptedToken(tokens.accessToken),
-        refreshTokenCiphertext: storeEncryptedToken(tokens.refreshToken),
-        tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scopes.length ? tokens.scopes : getTikTokScopes(),
-        providerMetadata: {
-          username: creatorInfo.creator_username ?? null,
-          nickname: creatorInfo.creator_nickname ?? null,
-          avatarUrl: creatorInfo.creator_avatar_url ?? null,
-          privacyLevelOptions: creatorInfo.privacy_level_options ?? [],
-        },
-        status: "active",
-        reauthRequired: false,
-        tokenErrorMessage: null,
-        lastValidatedAt: new Date(),
-        isActive: true,
+        OR: [
+          { externalId },
+          { accountName },
+        ],
       },
+      select: { id: true },
     });
+
+    const data = {
+      externalId,
+      accountName,
+      providerAccountType: "tiktok_oauth",
+      accessTokenCiphertext: storeEncryptedToken(tokens.accessToken),
+      refreshTokenCiphertext: storeEncryptedToken(tokens.refreshToken),
+      tokenExpiresAt: tokens.expiresAt,
+      scopes: tokens.scopes.length ? tokens.scopes : getTikTokScopes(),
+      providerMetadata: {
+        username: creatorInfo.creator_username ?? null,
+        nickname: creatorInfo.creator_nickname ?? null,
+        avatarUrl: creatorInfo.creator_avatar_url ?? null,
+        privacyLevelOptions: creatorInfo.privacy_level_options ?? [],
+      },
+      status: "active",
+      reauthRequired: false,
+      tokenErrorMessage: null,
+      lastValidatedAt: new Date(),
+      isActive: true,
+    } as const;
+
+    if (existingAccount) {
+      await prisma.socialAccount.update({
+        where: { id: existingAccount.id },
+        data,
+      });
+    } else {
+      await prisma.socialAccount.create({
+        data: {
+          userId: user.id,
+          platform: "TIKTOK",
+          ...data,
+        },
+      });
+    }
 
     return NextResponse.redirect(new URL("/settings?tiktokConnected=1", request.url));
   } catch (callbackError) {

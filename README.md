@@ -1,56 +1,182 @@
 # Short Video Automation
 
-Sistema web MVP para criacao de videos curtos verticais para redes sociais.
+Sistema web para criar videos curtos verticais para redes sociais com pipeline `Manus-only`, render local com FFmpeg e publicacao social via OAuth oficial.
 
 ## Stack
 
-- Next.js com App Router
+- Next.js 16
 - TypeScript
 - Tailwind CSS
 - Prisma
 - PostgreSQL
-- FFmpeg
-- Storage local no MVP
+- FFmpeg / ffprobe
+- Storage local
 
-## Rodando localmente
+## Fluxo atual
 
-1. Copie as variaveis de ambiente se necessario:
+1. Criar um projeto de conteudo
+2. Gerar assets com a Manus
+3. Revisar imagens, audio, roteiro e legenda
+4. Gerar o MP4 vertical
+5. Publicar agora ou agendar para Instagram, TikTok e YouTube
+
+O fluxo automatico de assets usa apenas a Manus. Se a Manus nao entregar imagens ou audio suficientes, o sistema preserva o plano textual e exige complemento manual antes da renderizacao final.
+
+## Requisitos locais
+
+- Node.js 20+
+- Docker e Docker Compose
+- FFmpeg e ffprobe instalados
+- Python opcional para Whisper local
+
+## Variaveis de ambiente
+
+Copie:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Suba o Postgres:
+Campos principais do `.env.example`:
+
+```env
+DATABASE_URL="postgresql://app:app@localhost:5433/short_video_automation?schema=public"
+FFMPEG_PATH="ffmpeg"
+FFPROBE_PATH="ffprobe"
+LOCAL_STORAGE_ROOT="./storage"
+MANUS_API_KEY=""
+SESSION_SECRET=""
+INITIAL_USER_EMAIL=""
+INITIAL_USER_PASSWORD=""
+APP_BASE_URL="http://localhost:3000"
+PUBLIC_MEDIA_BASE_URL=""
+SOCIAL_TOKEN_SECRET=""
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+GOOGLE_OAUTH_CALLBACK_URL="http://localhost:3000/api/oauth/youtube/callback"
+INSTAGRAM_APP_ID=""
+INSTAGRAM_APP_SECRET=""
+INSTAGRAM_OAUTH_CALLBACK_URL="http://localhost:3000/api/oauth/instagram/callback"
+TIKTOK_CLIENT_KEY=""
+TIKTOK_CLIENT_SECRET=""
+TIKTOK_OAUTH_CALLBACK_URL="http://localhost:3000/api/oauth/tiktok/callback"
+```
+
+### Observacoes importantes
+
+- `MANUS_API_KEY`: obrigatoria para geracao automatica de assets
+- `PUBLIC_MEDIA_BASE_URL`: obrigatoria para publicacao no Instagram e deve ser uma URL publica, nao `localhost`
+- credenciais de YouTube, Instagram e TikTok sao obrigatorias para OAuth e publicacao real
+- `SOCIAL_TOKEN_SECRET` deve ser um segredo forte em producao
+- `SESSION_SECRET` deve ter pelo menos 32 caracteres
+- `INITIAL_USER_EMAIL` e `INITIAL_USER_PASSWORD` permitem criar o primeiro acesso automaticamente no primeiro login
+
+## Rodando localmente
+
+1. Suba o banco:
 
 ```bash
 docker compose up -d
 ```
 
-O container expoe o Postgres em `localhost:5433` para evitar conflito com instalacoes locais usando `5432`.
-
-3. Instale dependencias e prepare o banco:
+2. Instale dependencias:
 
 ```bash
 npm install
+```
+
+3. Gere o client Prisma e aplique as migrations:
+
+```bash
 npm run prisma:generate
 npm run prisma:deploy
 ```
 
-4. Garanta que o FFmpeg esteja instalado e acessivel via `ffmpeg`, ou ajuste `FFMPEG_PATH` no `.env`.
-   Se o `ffprobe` nao estiver no PATH, ajuste tambem `FFPROBE_PATH`.
+4. Rode o servidor:
 
-5. Para testar a Gemini, preencha no `.env`:
-
-```env
-GEMINI_API_KEY="sua-chave-da-gemini"
+```bash
+npm run dev
 ```
 
-Sem essa variavel, o app continua funcionando no fluxo manual e mostra um erro amigavel ao clicar em `Gerar assets com Gemini`.
+5. Acesse:
 
-Para usar Manus como provedor principal, configure `MANUS_API_KEY` no `.env` ou salve a chave em `/settings`.
-As chaves sao usadas somente no servidor e nao devem ser commitadas.
+```txt
+http://localhost:3000/dashboard
+```
 
-6. Para legendas com timestamps reais, instale o Whisper local:
+## Build de producao
+
+```bash
+npm run build
+npm run start
+```
+
+## Scripts
+
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run test`
+- `npm run lint`
+- `npm run prisma:generate`
+- `npm run prisma:deploy`
+- `npm run db:studio`
+
+## Docker
+
+Para desenvolvimento rapido, o repositório ainda possui o Postgres isolado em [docker-compose.yml](./docker-compose.yml):
+
+```bash
+docker compose up -d
+```
+
+Para VPS e producao, use:
+
+- [Dockerfile](./Dockerfile)
+- [docker-compose.production.yml](./docker-compose.production.yml)
+
+## Rotas principais
+
+- `/dashboard`
+- `/contents`
+- `/contents/new`
+- `/contents/[id]`
+- `/schedule`
+- `/settings`
+
+## Publicacao social
+
+O projeto suporta conexao e publicacao para:
+
+- YouTube
+- Instagram
+- TikTok
+
+Cada plataforma exige:
+
+- app de desenvolvedor proprio do cliente
+- credenciais OAuth oficiais
+- redirect URI configurado
+
+Sem essas credenciais, o sistema nao consegue concluir autenticacao nem publicacao.
+
+## Manus
+
+A Manus e o unico provedor automatico de assets deste projeto.
+
+Ela e responsavel por:
+
+- roteiro
+- caption
+- ideias de cena
+- imagens
+- audio
+
+Quando a resposta vier parcial, o sistema salva o que foi retornado e deixa o restante para revisao/manual.
+
+## Whisper local
+
+Opcionalmente, voce pode instalar Whisper para melhorar o timing das legendas:
 
 ```bash
 python -m pip install -r requirements-whisper.txt
@@ -67,284 +193,87 @@ WHISPER_COMPUTE_TYPE="int8"
 WHISPER_TIMEOUT_MS="240000"
 ```
 
-Se o Whisper local nao estiver instalado, o app continua gerando videos com sincronizacao aproximada baseada na duracao do audio.
+Sem Whisper, o sistema ainda gera o video usando sincronizacao aproximada baseada na duracao do audio.
 
-7. Rode o app:
-
-```bash
-npm run dev
-```
-
-## Fluxo MVP
-
-1. Criar conteudo
-2. Enviar imagens
-3. Enviar audio
-4. Adicionar legenda
-5. Revisar conteudo
-6. Gerar video vertical MP4 em 1080x1920
-7. Baixar video
-8. Consultar historico
-
-## Rotas principais
-
-- `/dashboard`: visao geral e projetos recentes.
-- `/contents`: lista de projetos de conteudo.
-- `/contents/new`: criacao de projeto com prompt, legenda, imagens e audio.
-- `/contents/[id]`: revisao do projeto, geracao do MP4, download e agendamento basico.
-- `/schedule`: lista de postagens agendadas salvas no banco.
-- `/settings`: base visual para configuracoes e integracoes futuras.
-
-## Arquitetura de pastas
+## Estrutura principal
 
 ```txt
 src/
   app/
-    api/                    # API routes do App Router
-    contents/               # criacao, revisao e historico
-    dashboard/              # visao geral
-    schedule/               # agendamentos salvos
-    settings/               # configuracoes e Manus
-  components/               # componentes reutilizaveis de UI
+    api/
+    contents/
+    dashboard/
+    schedule/
+    settings/
+  components/
   features/
-    content/                # dominio principal do MVP
-      actions.ts            # server actions do fluxo
-      queries.ts            # consultas Prisma
-      services/             # upload e persistencia de midias
-      components/           # componentes especificos do dominio
-      types.ts
-    schedule/               # actions e queries de agendamento
-    settings/               # actions e queries de configuracao
+    content/
+    schedule/
+    settings/
     video/
-      services/             # VideoService com FFmpeg/ffprobe
   integrations/
-    gemini/                 # integracao real de teste com Google Gemini
-    manus/                  # cliente Manus com API real quando configurada e fallback local
-    social/                 # stub para publicacao/agendamento futuro
+    manus/
+    social/
   lib/
-    api-response.ts         # respostas padronizadas de API
-    formatters.ts           # formatadores compartilhados
-    storage/                # storage local substituivel por S3/R2
-    paths.ts
-    prisma.ts
 prisma/
-  schema.prisma             # modelos User, ContentProject, MediaFile, GeneratedVideo, ScheduledPost e SocialAccount
 storage/
-  uploads/                  # arquivos enviados no MVP
-  generated/                # MP4s gerados no MVP
 ```
 
-## Banco de dados
+## Entrega em VPS
 
-O schema principal fica em `prisma/schema.prisma` e possui:
+Antes de colocar em VPS, confirme:
 
-- `User`: usuario dono de projetos e contas sociais.
-- `ContentProject`: projeto de conteudo com titulo, prompt, tipo, status e data de criacao.
-- `MediaFile`: arquivos usados no projeto, como imagem, audio, legenda e video.
-- `GeneratedVideo`: video final gerado, com caminho, duracao, resolucao e status.
-- `ScheduledPost`: agendamento futuro por plataforma.
-- `SocialAccount`: conta social conectavel futuramente.
+- Node instalado
+- FFmpeg e ffprobe instalados
+- banco Postgres acessivel
+- `.env` preenchido com credenciais reais
+- dominio/HTTPS configurado para os callbacks OAuth
+- `PUBLIC_MEDIA_BASE_URL` apontando para URL publica valida
 
-Para aplicar a migration apos subir o Docker:
+### Passo a passo recomendado
 
-```bash
-docker compose up -d
-npm run prisma:generate
-npm run prisma:deploy
-```
-
-Se quiser inspecionar o banco:
-
-```bash
-npm run db:studio
-```
-
-## Upload de arquivos
-
-Os uploads ficam no storage local do MVP:
-
-```txt
-storage/
-  uploads/
-    <contentProjectId>/
-      <uuid>-<nome-sanitizado>
-  generated/
-    <contentProjectId>.mp4
-```
-
-Cada upload tambem gera um registro em `media_files`, vinculado ao `ContentProject` por `projectId`.
-
-Endpoints:
-
-- `POST /api/content-projects`
-  - Cria um `ContentProject`.
-  - Salva multiplas imagens e um audio em `storage/uploads/<projectId>/`.
-  - Cria os registros `MediaFile` no banco.
-  - Espera `multipart/form-data` com:
-    - `title`
-    - `prompt`
-    - `caption` opcional
-    - `contentType`: `REELS`, `STORY`, `TIKTOK` ou `YOUTUBE_SHORTS`
-    - `images`: um ou mais arquivos
-    - `audio`: um arquivo
-
-- `POST /api/content-projects/[id]/media`
-  - Anexa novas midias a um projeto existente.
-  - Espera `multipart/form-data` com:
-    - `images`: zero ou mais arquivos
-    - `audio`: zero ou um arquivo
-
-Validacao:
-
-- Imagens aceitas: JPG, PNG e WEBP.
-- Audios aceitos: MP3, WAV, M4A, AAC, OGG e WEBM.
-- Qualquer outro MIME type retorna erro `400`.
-
-## Geracao de video
-
-A geracao fica isolada em `src/features/video/services/video-service.ts`, na classe `VideoService`.
-
-Fluxo:
-
-1. Busca o `ContentProject` e seus `MediaFile`.
-2. Valida se ha pelo menos uma imagem e um audio.
-3. Usa `ffprobe` para calcular a duracao total do audio.
-4. Divide a duracao do audio igualmente entre as imagens.
-5. Usa FFmpeg para gerar um MP4 vertical `1080x1920`.
-6. Tenta transcrever o audio com Whisper local para obter timestamps reais.
-7. Gera uma legenda `.ass` premium com texto branco, contorno preto, sem fundo e margem segura.
-8. Se o Whisper nao estiver disponivel, usa fallback proporcional pela duracao do audio.
-9. Salva o video em `storage/generated/<projectId>.mp4`.
-10. Cria/atualiza `GeneratedVideo`.
-11. Atualiza `ContentProject.status` para `READY`.
-12. Em caso de erro, atualiza `ContentProject.status` para `ERROR`.
-
-Endpoint:
-
-- `POST /api/content-projects/[id]/generate`
-  - Gera o video final do projeto.
-  - Retorna caminho, duracao e resolucao do video gerado.
-  - Opcionalmente aceita JSON `{ "caption": "texto da legenda" }` para sobrescrever a legenda salva apenas nessa geracao.
-
-## Gemini
-
-A integracao de teste com Google Gemini fica em `src/integrations/gemini/gemini-service.ts`.
-
-O service le a chave apenas do servidor, por `process.env.GEMINI_API_KEY`, e expõe:
-
-- `generateReelsPlan(prompt)`: envia o prompt para `gemini-2.5-flash` e retorna roteiro, legenda, caption, hashtags, ideias de cenas e prompts de imagem.
-- `generateSceneImages(imagePrompts)`: tenta gerar imagens verticais 9:16 com `gemini-2.5-flash-image`.
-- `generateNarrationAudio(script)`: tenta gerar narracao em portugues brasileiro com `gemini-2.5-flash-preview-tts`.
-- `generateTestAssetsForProject(projectId, prompt)`: salva imagens/audio em `storage/uploads/<projectId>/`, registra `MediaFile` no banco e atualiza titulo/legenda do projeto.
-
-Na tela `/contents/[id]`, o botao `Gerar assets com Gemini` ainda pode disparar esse fluxo diretamente. No fluxo assistido principal, a criacao em `/contents/new` tenta gerar assets por Manus quando configurada e usa Gemini como fallback quando necessario. Se imagem ou audio nao forem retornados, o sistema mantem o plano textual gerado e permite continuar com upload manual.
-
-A Gemini atua como fallback quando a Manus nao estiver configurada ou nao conseguir entregar todos os assets. O fluxo principal e Manus-first, mantendo a Gemini como rede de seguranca para a geracao do plano textual, imagens e audio.
-
-## Pipeline de IA e troubleshooting
-
-Prioridade do fluxo de assets:
-
-Resumo operacional: Manus primary, Gemini fallback.
-
-1. Manus cria a task principal, registra status/task id e tenta retornar plano + anexos.
-2. Gemini atua como fallback/teste quando Manus nao esta configurada ou retorna resultado parcial.
-3. Se imagem ou audio nao forem gerados, o projeto preserva o plano textual e mostra orientacao para upload manual.
-
-Falhas comuns e acao recomendada:
-
-- Quota excedida: aguarde a janela do provedor ou troque a chave/modelo configurado.
-- Chave invalida: revise `MANUS_API_KEY`, `GEMINI_API_KEY` e as permissoes da conta.
-- Modelo indisponivel: tente novamente mais tarde ou ajuste a preferencia de modelo em `/settings`.
-- Anexos vazios: complete imagens/audio pelo upload manual antes de gerar o MP4.
-- Acao manual requerida: acesse a conta do provedor, resolva a solicitacao e rode novamente.
-
-Nunca exponha chaves em componentes de frontend, logs compartilhados ou commits.
-
-## Agendamento
-
-O MVP salva agendamentos em `scheduled_posts`, sem publicar automaticamente.
-
-Na tela `/contents/[id]`, depois que houver video gerado, o usuario pode escolher:
-
-- plataforma: Instagram, TikTok ou YouTube
-- data
-- horario
-- caption da postagem
-
-Ao salvar, o sistema cria um `ScheduledPost`, atualiza o projeto para `SCHEDULED` e mostra o item em `/schedule`.
-
-## Manus
-
-A integracao com Manus fica concentrada em `src/integrations/manus/manus-service.ts`.
-Quando `MANUS_API_KEY` estiver no `.env` ou a chave estiver salva em `/settings`, o service usa a API da Manus para criar tarefas, consultar mensagens e baixar anexos retornados. Sem chave configurada, o app mantem comportamento de fallback/mock para nao quebrar o fluxo manual do MVP.
-
-O service expõe:
-
-- `createTask(prompt)`
-- `getTaskStatus(taskId)`
-- `listTaskMessages(taskId)`
-- `downloadGeneratedFiles(taskId)`
-
-O uso real da API depende de chave e plano com acesso liberado. Se a Manus nao retornar imagens/audio suficientes, o usuario ainda pode completar o projeto pelo upload manual.
-
-As configuracoes da Manus ficam em `/settings` e sao salvas em `manus_settings`:
-
-- API Key
-- preferencia de modelo
-- preferencia de prompt
-- configuracao padrao para Reels
-- configuracao padrao para Stories
-
-## Decisoes de arquitetura
-
-- `features/content` concentra o fluxo principal para evitar espalhar regra de negocio pelas paginas.
-- `features/video/services/video-service.ts` isola a chamada ao FFmpeg. Esse modulo pode virar um worker/fila depois sem mudar as telas.
-- `lib/storage/local-storage.ts` encapsula gravacao em disco. Uma futura migracao para S3/R2 deve preservar a mesma ideia de contrato.
-- `integrations/manus` possui cliente real quando a chave esta configurada e fallback quando nao esta. `integrations/social` permanece como interface/stub; nenhuma publicacao real em Instagram, TikTok ou YouTube e feita no MVP.
-- O banco salva projetos, arquivos de midia, videos gerados, contas sociais e agendamentos futuros.
-
-## Rodando do zero
-
-Em uma maquina nova:
-
-```bash
-git clone https://github.com/gustavomenani/automa-o-para-cria-o-de-v-deos-curtos-para-redes-sociais.git
-cd automa-o-para-cria-o-de-v-deos-curtos-para-redes-sociais
-npm install
-copy .env.example .env
-docker compose up -d
-npm run prisma:generate
-npm run prisma:deploy
-npm run dev
-```
-
-No Windows deste projeto, o `.env.example` ja aponta para:
+1. Copie o projeto para a VPS
+2. Crie o `.env` a partir do `.env.example`
+3. Preencha todas as credenciais reais
+4. Ajuste:
 
 ```env
-FFMPEG_PATH="C:/ffmpeg/bin/ffmpeg.exe"
-FFPROBE_PATH="C:/ffmpeg/bin/ffprobe.exe"
+APP_BASE_URL="https://seu-dominio.com"
+PUBLIC_MEDIA_BASE_URL="https://seu-dominio.com"
+SESSION_SECRET="seu-segredo-forte"
+SOCIAL_TOKEN_SECRET="outro-segredo-forte"
 ```
 
-Depois acesse `http://localhost:3000/dashboard`.
+5. Suba a stack:
 
-Para validar a Gemini:
+```bash
+docker compose -f docker-compose.production.yml up -d --build
+```
 
-1. Adicione `GEMINI_API_KEY` no `.env`.
-2. Reinicie `npm run dev`.
-3. Crie um projeto com prompt em `/contents/new`.
-4. Abra `/contents/[id]` e clique em `Gerar assets com Gemini`.
-5. Confira o roteiro, captions, hashtags, prompts e arquivos salvos na tela de revisao.
+6. Verifique os logs:
 
-Para validar o fallback sem chave, remova `GEMINI_API_KEY` do `.env`, reinicie o servidor e clique no mesmo botao. A tela deve mostrar a mensagem `GEMINI_API_KEY não configurada. Adicione a chave no arquivo .env.` e o fluxo manual continua disponivel.
+```bash
+docker compose -f docker-compose.production.yml logs -f app
+```
 
-Fluxo manual para validar:
+7. Acesse:
 
-1. Abra `/contents/new`.
-2. Preencha titulo, prompt, tipo e legenda.
-3. Envie imagens e um audio.
-4. Clique em `Salvar e gerar video`.
-5. Revise em `/contents/[id]`.
-6. Baixe o video gerado.
-7. Preencha plataforma, data, horario e caption.
-8. Salve o agendamento e confira em `/schedule`.
+```txt
+https://seu-dominio.com/login
+```
+
+### Observacoes de producao
+
+- o container da aplicacao executa `prisma migrate deploy` na inicializacao
+- o storage fica persistido em volume Docker
+- o banco tambem fica persistido em volume Docker
+- para SSL e dominio publico, o ideal e colocar Nginx ou Caddy na frente do container
+
+## Testes realizados
+
+Com o estado atual do projeto:
+
+- `npm run build`
+- `npx vitest run`
+
+ambos passaram localmente antes do ultimo push.

@@ -72,7 +72,11 @@ function runProcess(command: string, args: string[], timeoutMs: number) {
 export class TranscriptionService {
   async transcribe(audioPath: string): Promise<TranscriptionSegment[] | null> {
     const pythonPath = process.env.WHISPER_PYTHON_PATH || "python";
-    const scriptPath = path.join(process.cwd(), "scripts", "transcribe_audio.py");
+    const scriptPath = path.join(
+      /*turbopackIgnore: true*/ process.cwd(),
+      "scripts",
+      "transcribe_audio.py",
+    );
     const model = process.env.WHISPER_MODEL || "base";
     const language = process.env.WHISPER_LANGUAGE || "pt";
     const device = process.env.WHISPER_DEVICE || "cpu";

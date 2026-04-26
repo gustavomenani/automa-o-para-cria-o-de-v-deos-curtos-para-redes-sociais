@@ -51,6 +51,18 @@ describe("media validation", () => {
     ).rejects.toMatchObject({ category: "formato" });
   });
 
+  it("rejects audio whose declared MIME type does not match the detected signature", async () => {
+    await expect(
+      validateMediaFiles(
+        {
+          images: [file(png, "a.png", "image/png")],
+          audio: file(mp3, "fake.wav", "audio/wav"),
+        },
+        { probeAudioDuration: vi.fn(async () => 30) },
+      ),
+    ).rejects.toMatchObject({ category: "formato" });
+  });
+
   it("rejects excessive image counts", async () => {
     const images = Array.from({ length: MEDIA_LIMITS.maxImages + 1 }, (_, index) =>
       file(png, `${index}.png`, "image/png"),

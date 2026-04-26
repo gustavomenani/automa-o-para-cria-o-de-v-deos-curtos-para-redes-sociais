@@ -3,7 +3,8 @@ import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/features/auth/session";
 import { prisma } from "@/lib/prisma";
-import { storageRoot } from "@/lib/paths";
+import { resolvedStorageRoot } from "@/lib/paths";
+import { verifyFileAccessToken } from "@/lib/file-access-token";
 
 const mimeTypes: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -20,27 +21,37 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
-  const user = await getCurrentUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Faca login para acessar seus projetos." }, { status: 401 });
-  }
-
   const { path: pathSegments } = await params;
-  const filePath = path.resolve(storageRoot, ...pathSegments);
-  const relative = path.relative(storageRoot, filePath);
+  const filePath = path.resolve(resolvedStorageRoot, ...pathSegments);
+  const relative = path.relative(resolvedStorageRoot, filePath);
+  const relativePath = relative.split(path.sep).join("/");
 
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
     return NextResponse.json({ error: "Arquivo nao encontrado." }, { status: 404 });
   }
 
+  const user = await getCurrentUser();
+  const accessToken = request.nextUrl.searchParams.get("access");
+  const hasSignedAccess =
+    !user &&
+    typeof accessToken === "string" &&
+    verifyFileAccessToken(accessToken, relativePath);
+
+  if (!user && !hasSignedAccess) {
+    return NextResponse.json({ error: "Faca login para acessar seus projetos." }, { status: 401 });
+  }
+
   const [mediaFile, generatedVideo] = await Promise.all([
     prisma.mediaFile.findFirst({
-      where: { path: filePath, project: { userId: user.id } },
+      where: user
+        ? { path: filePath, project: { userId: user.id } }
+        : { path: filePath },
       select: { id: true },
     }),
     prisma.generatedVideo.findFirst({
-      where: { path: filePath, project: { userId: user.id } },
+      where: user
+        ? { path: filePath, project: { userId: user.id } }
+        : { path: filePath },
       select: { id: true },
     }),
   ]);

@@ -10,9 +10,8 @@ export function sanitizeRunSummary(summary: Prisma.InputJsonValue): Prisma.Input
   let jsonString = typeof summary === "string" ? summary : JSON.stringify(summary);
   
   // Redact API Keys
-  jsonString = jsonString.replace(/(MANUS_API_KEY|GEMINI_API_KEY|apiKey)["':\s]+([^"'\s,}]+)/gi, '$1": "[REDACTED]"');
+  jsonString = jsonString.replace(/(MANUS_API_KEY|apiKey)["':\s]+([^"'\s,}]+)/gi, '$1": "[REDACTED]"');
   jsonString = jsonString.replace(/sk-[a-zA-Z0-9]{32,}/g, "sk-[REDACTED]");
-  jsonString = jsonString.replace(/AIza[0-9A-Za-z-_]{35}/g, "AIza[REDACTED]");
   
   // Redact local paths
   jsonString = jsonString.replace(/[a-zA-Z]:\\[^\s"']+/g, "[LOCAL_PATH_REDACTED]");

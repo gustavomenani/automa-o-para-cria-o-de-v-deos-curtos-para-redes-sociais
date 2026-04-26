@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { ContentList } from "@/features/content/components/content-list";
 import { getDashboardStats } from "@/features/content/queries";
 import { requireUser } from "@/features/auth/session";
+import { formatDateTime } from "@/lib/formatters";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,81 @@ export default async function DashboardPage() {
               <p className="mt-4 text-3xl font-semibold tracking-tight">{item.value}</p>
             </div>
           ))}
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-3">
+          <div className="rounded-lg border border-stone-200 bg-white p-5">
+            <p className="text-sm font-medium uppercase tracking-[0.18em] text-teal-700">
+              Ultima publicacao
+            </p>
+            {stats.latestPublishedPost ? (
+              <>
+                <p className="mt-3 font-semibold text-zinc-950">
+                  {stats.latestPublishedPost.project.title}
+                </p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  {stats.latestPublishedPost.platform.toLowerCase()} ·{" "}
+                  {stats.latestPublishedPost.socialAccount?.accountName ?? "conta nao informada"}
+                </p>
+                <p className="mt-2 text-sm text-zinc-600">
+                  {stats.latestPublishedPost.publishedAt
+                    ? `${formatDateTime(stats.latestPublishedPost.publishedAt).date} ${formatDateTime(stats.latestPublishedPost.publishedAt).time}`
+                    : "Sem horario registrado"}
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 text-sm leading-6 text-zinc-500">
+                Nenhuma publicacao concluida ainda.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-stone-200 bg-white p-5">
+            <p className="text-sm font-medium uppercase tracking-[0.18em] text-amber-700">
+              Ultimo erro
+            </p>
+            {stats.latestFailedPost ? (
+              <>
+                <p className="mt-3 font-semibold text-zinc-950">
+                  {stats.latestFailedPost.project.title}
+                </p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  {stats.latestFailedPost.platform.toLowerCase()}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-zinc-600">
+                  {stats.latestFailedPost.publishErrorMessage ?? "Falha sem detalhe salvo."}
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 text-sm leading-6 text-zinc-500">
+                Nenhum erro de publicacao recente.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-stone-200 bg-white p-5">
+            <p className="text-sm font-medium uppercase tracking-[0.18em] text-sky-700">
+              Ultima sync Manus
+            </p>
+            {stats.latestManusRun ? (
+              <>
+                <p className="mt-3 font-semibold text-zinc-950">
+                  {stats.latestManusRun.project.title}
+                </p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  {stats.latestManusRun.status.toLowerCase()}
+                </p>
+                <p className="mt-2 text-sm text-zinc-600">
+                  {formatDateTime(stats.latestManusRun.createdAt).date}{" "}
+                  {formatDateTime(stats.latestManusRun.createdAt).time}
+                </p>
+              </>
+            ) : (
+              <p className="mt-3 text-sm leading-6 text-zinc-500">
+                Nenhuma sincronizacao Manus registrada ainda.
+              </p>
+            )}
+          </div>
         </section>
 
         <section>

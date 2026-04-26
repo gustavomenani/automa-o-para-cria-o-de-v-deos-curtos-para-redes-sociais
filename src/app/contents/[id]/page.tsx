@@ -1,12 +1,17 @@
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   CalendarClock,
   Download,
+  FileAudio,
   FileVideo,
   ImageIcon,
+  LayoutList,
   Music2,
+  RadioTower,
+  ScrollText,
 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { FeedbackBanner } from "@/components/feedback-banner";
@@ -16,6 +21,7 @@ import { CaptionReviewForm } from "@/features/content/components/caption-review-
 import { DeleteContentButton } from "@/features/content/components/delete-content-button";
 import { GenerateVideoButton } from "@/features/content/components/generate-video-button";
 import { ManusSyncMonitor } from "@/features/content/components/manus-sync-monitor";
+import { SocialAccountPreferenceApplier } from "@/features/content/components/social-account-preference-applier";
 import {
   generateContentVideoAction,
   publishSocialNowAction,
@@ -34,10 +40,21 @@ import { schedulePostAction } from "@/features/schedule/actions";
 import { getConnectedSocialAccounts } from "@/features/settings/queries";
 import { CAPTION_SYNC_WARNING } from "@/features/video/services/caption-helpers";
 import { readStoredManusPlan } from "@/integrations/manus/manus-service";
-import { formatContentType, formatFileSize } from "@/lib/formatters";
+import { formatContentType, formatDateTime, formatFileSize } from "@/lib/formatters";
 import { toPublicFileUrl } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
+
+type ContentTab = "summary" | "assets" | "video" | "publishing" | "schedule" | "logs";
+
+const tabs: Array<{ id: ContentTab; label: string; icon: ComponentType<{ size?: number }> }> = [
+  { id: "summary", label: "Resumo", icon: LayoutList },
+  { id: "assets", label: "Assets", icon: ImageIcon },
+  { id: "video", label: "Video", icon: FileVideo },
+  { id: "publishing", label: "Publicacao", icon: RadioTower },
+  { id: "schedule", label: "Agenda", icon: CalendarClock },
+  { id: "logs", label: "Logs", icon: ScrollText },
+];
 
 function getLocalDateInputValue(date: Date) {
   const year = date.getFullYear();
@@ -59,6 +76,23 @@ function decodeFeedbackMessage(value: string | undefined, fallback: string) {
   }
 }
 
+function getTabHref(contentId: string, tab: ContentTab) {
+  return `/contents/${contentId}?tab=${tab}`;
+}
+
+function renderJobRunStatus(status: string) {
+  switch (status) {
+    case "COMPLETED":
+      return "Concluido";
+    case "FAILED":
+      return "Falhou";
+    case "RUNNING":
+      return "Em execucao";
+    default:
+      return "Na fila";
+  }
+}
+
 export default async function ContentDetailsPage({
   params,
   searchParams,
@@ -76,6 +110,7 @@ export default async function ContentDetailsPage({
     captionSaved?: string;
     scheduleError?: string;
     videoWarning?: string;
+    tab?: ContentTab;
   }>;
 }) {
   const { id } = await params;
@@ -88,8 +123,10 @@ export default async function ContentDetailsPage({
     notFound();
   }
 
+  const activeTab = tabs.some((tab) => tab.id === feedback.tab) ? feedback.tab! : "summary";
   const images = content.mediaFiles.filter((asset) => asset.type === "IMAGE");
-  const audio = content.mediaFiles.find((asset) => asset.type === "AUDIO");
+  const audio = [...content.mediaFiles].reverse().find((asset) => asset.type === "AUDIO");
+  const subtitles = content.mediaFiles.filter((asset) => asset.type === "SUBTITLE");
   const generatedVideo = content.generatedVideos.at(0);
   const videoPath = generatedVideo?.path;
   const videoUrl = videoPath ? toPublicFileUrl(videoPath) : null;
@@ -136,10 +173,44 @@ export default async function ContentDetailsPage({
         : feedback.publishedPlatform === "YOUTUBE"
           ? "YouTube"
           : null;
+  const hasConnectedAccount =
+    instagramAccounts.length + tiktokAccounts.length + youtubeAccounts.length > 0;
+  const isReadyToPublish = Boolean(videoUrl) && hasConnectedAccount;
+  const readinessItems = [
+    {
+      label: "Imagens",
+      value:
+        images.length >= 8 && images.length <= 10
+          ? `${images.length} prontas`
+          : `${images.length}/8-10`,
+      ok: images.length >= 8 && images.length <= 10,
+    },
+    {
+      label: "Audio",
+      value: audio ? audio.originalName : "faltando",
+      ok: Boolean(audio),
+    },
+    {
+      label: "Video",
+      value: videoUrl ? "MP4 pronto" : "pendente",
+      ok: Boolean(videoUrl),
+    },
+    {
+      label: "Conta conectada",
+      value: hasConnectedAccount ? `${socialAccounts.length} disponiveis` : "nenhuma",
+      ok: hasConnectedAccount,
+    },
+    {
+      label: "Pronto para publicar",
+      value: isReadyToPublish ? "sim" : "nao",
+      ok: isReadyToPublish,
+    },
+  ];
 
   return (
     <AppShell>
       <ManusSyncMonitor contentId={content.id} active={shouldAutoSyncManus} />
+      <SocialAccountPreferenceApplier />
       <div className="space-y-6">
         <Link
           href="/contents"
@@ -272,79 +343,20 @@ export default async function ContentDetailsPage({
           <FeedbackBanner
             type="info"
             title="Assets incompletos"
-            message={`O provedor de IA gerou texto, mas faltou ${missingAssets.images ? "imagens" : ""}${missingAssets.images && missingAssets.audio ? " e " : ""}${missingAssets.audio ? "áudio" : ""}. Complete manualmente enviando os arquivos ou gere novamente.`}
+            message={`O provedor de IA gerou texto, mas faltou ${missingAssets.images ? "imagens" : ""}${missingAssets.images && missingAssets.audio ? " e " : ""}${missingAssets.audio ? "audio" : ""}. Complete manualmente enviando os arquivos ou gere novamente.`}
           />
         ) : null}
 
         {manualActionRequired ? (
           <FeedbackBanner
             type="info"
-            title="Ação manual necessária"
-            message="O provedor de IA pausou o processo solicitando interação manual. Verifique sua conta no provedor."
+            title="Acao manual necessaria"
+            message="O provedor de IA pausou o processo solicitando interacao manual. Verifique sua conta no provedor."
           />
         ) : null}
 
-        {latestRun ? (
-          <section className="rounded-lg border border-stone-200 bg-white p-5">
-            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-[0.2em] text-teal-700">
-                  Geracao de assets
-                </p>
-                <h2 className="mt-2 text-xl font-semibold">
-                  {latestRun.provider === "MANUS" ? "Manus" : latestRun.provider}
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-zinc-600">
-                  Status da ultima tentativa automatica. Se faltarem midias, complete com upload
-                  manual antes de gerar o MP4.
-                </p>
-              </div>
-              <span className="inline-flex w-fit rounded-full bg-stone-100 px-3 py-1 text-sm font-semibold text-zinc-700">
-                {formatAssetRunStatus(latestRun.status)}
-              </span>
-            </div>
-
-            <dl className="mt-5 grid gap-3 border-t border-stone-200 pt-5 text-sm sm:grid-cols-4">
-              <div>
-                <dt className="text-zinc-500">Provedor</dt>
-                <dd className="mt-1 font-medium">
-                  {latestRun.provider === "MANUS" ? "Manus" : latestRun.provider}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-zinc-500">Task ID</dt>
-                <dd className="mt-1 font-medium">{maskProviderTaskId(latestRun.providerTaskId)}</dd>
-              </div>
-              <div>
-                <dt className="text-zinc-500">Iniciado em</dt>
-                <dd className="mt-1 font-medium">{latestRun.startedAt.toLocaleString("pt-BR")}</dd>
-              </div>
-              <div>
-                <dt className="text-zinc-500">Finalizado em</dt>
-                <dd className="mt-1 font-medium">
-                  {latestRun.finishedAt ? latestRun.finishedAt.toLocaleString("pt-BR") : "em aberto"}
-                </dd>
-              </div>
-            </dl>
-
-            {runSummaryMessage ? (
-              <p className="mt-4 rounded-md bg-stone-50 p-4 text-sm leading-6 text-zinc-600">
-                {runSummaryMessage}
-              </p>
-            ) : null}
-
-            {latestRun.status === "RUNNING" && latestRun.provider === "MANUS" ? (
-              <form action={syncManusAssetsAction.bind(null, content.id)} className="mt-4">
-                <SubmitButton pendingLabel="Sincronizando assets..." icon="wand">
-                  Sincronizar assets da Manus
-                </SubmitButton>
-              </form>
-            ) : null}
-          </section>
-        ) : null}
-
         <section className="rounded-lg border border-stone-200 bg-white p-5">
-          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
+          <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-start">
             <div>
               <div className="flex flex-wrap items-center gap-3">
                 <p className="text-sm font-medium uppercase tracking-[0.2em] text-teal-700">
@@ -361,7 +373,13 @@ export default async function ContentDetailsPage({
               </p>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              <Link
+                href={`/contents/new?duplicate=${content.id}`}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-stone-100"
+              >
+                Duplicar projeto
+              </Link>
               {videoUrl ? (
                 <a
                   href={`${videoUrl}?download=1`}
@@ -372,16 +390,11 @@ export default async function ContentDetailsPage({
                 </a>
               ) : null}
               <Link
-                href="#schedule-post"
-                aria-disabled={!videoUrl}
-                className={`inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-semibold ${
-                  videoUrl
-                    ? "border border-stone-300 bg-white text-zinc-900 hover:bg-stone-100"
-                    : "pointer-events-none border border-stone-200 bg-stone-100 text-zinc-400"
-                }`}
+                href={getTabHref(content.id, "schedule")}
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-stone-100"
               >
                 <CalendarClock size={16} />
-                Agendar postagem
+                Abrir agenda
               </Link>
               <form action={generateContentVideoAction.bind(null, content.id)}>
                 <GenerateVideoButton hasVideo={Boolean(videoUrl)} locked={isGenerationLocked} />
@@ -389,9 +402,232 @@ export default async function ContentDetailsPage({
               <DeleteContentButton contentId={content.id} />
             </div>
           </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {readinessItems.map((item) => (
+              <div
+                key={item.label}
+                className={`rounded-lg border p-4 ${
+                  item.ok ? "border-emerald-200 bg-emerald-50" : "border-stone-200 bg-stone-50"
+                }`}
+              >
+                <p className="text-sm font-medium text-zinc-500">{item.label}</p>
+                <p className="mt-2 text-lg font-semibold text-zinc-950">{item.value}</p>
+              </div>
+            ))}
+          </div>
         </section>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <nav className="flex flex-wrap gap-2">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = tab.id === activeTab;
+
+            return (
+              <Link
+                key={tab.id}
+                href={getTabHref(content.id, tab.id)}
+                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  isActive
+                    ? "bg-zinc-950 text-white"
+                    : "border border-stone-300 bg-white text-zinc-900 hover:bg-stone-100"
+                }`}
+              >
+                <Icon size={15} />
+                {tab.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {activeTab === "summary" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <section className="space-y-5 rounded-lg border border-stone-200 bg-white p-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-md bg-stone-50 p-4">
+                  <h2 className="text-sm font-semibold">Prompt</h2>
+                  <p className="mt-2 text-sm leading-6 text-zinc-600">{content.prompt}</p>
+                </div>
+                <div className="rounded-md bg-stone-50 p-4">
+                  <h2 className="text-sm font-semibold">Legenda base</h2>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-600">
+                    {content.caption || "Sem legenda definida."}
+                  </p>
+                </div>
+              </div>
+
+              {manusPlan ? (
+                <div className="space-y-4 border-t border-stone-200 pt-5">
+                  <div>
+                    <h2 className="text-sm font-semibold">Roteiro Manus</h2>
+                    <p className="mt-2 text-sm leading-6 text-zinc-600">
+                      {typeof manusPlan.script === "string"
+                        ? manusPlan.script
+                        : "Sem roteiro estruturado salvo."}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-md bg-stone-50 p-4">
+                      <h3 className="text-sm font-semibold">Caption da postagem</h3>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-600">
+                        {typeof manusPlan.caption === "string"
+                          ? manusPlan.caption
+                          : "Sem caption estruturada salva."}
+                      </p>
+                    </div>
+                    <div className="rounded-md bg-stone-50 p-4">
+                      <h3 className="text-sm font-semibold">Hashtags</h3>
+                      <p className="mt-2 text-sm leading-6 text-zinc-600">
+                        {Array.isArray(manusPlan.hashtags) ? manusPlan.hashtags.join(" ") : ""}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+
+            <aside className="space-y-5">
+              <section className="rounded-lg border border-stone-200 bg-white p-5">
+                <h2 className="font-semibold">Panorama rapido</h2>
+                <div className="mt-4 space-y-4 text-sm leading-6 text-zinc-600">
+                  <p>{images.length} imagens salvas no projeto.</p>
+                  <p>{audio ? "Audio presente." : "Audio ainda nao enviado."}</p>
+                  <p>{subtitles.length > 0 ? "Legenda de apoio ja gerada." : "Sem arquivo de legenda salvo."}</p>
+                  <p>{videoUrl ? "Video pronto para baixar, agendar e publicar." : "Video ainda precisa ser renderizado."}</p>
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-stone-200 bg-white p-5">
+                <h2 className="font-semibold">Legenda</h2>
+                <div className="mt-3">
+                  {shouldReviewCaption && content.caption ? (
+                    <CaptionReviewForm contentId={content.id} caption={content.caption} />
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-zinc-600">
+                      {content.caption || "Sem legenda definida."}
+                    </p>
+                  )}
+                </div>
+              </section>
+            </aside>
+          </div>
+        ) : null}
+
+        {activeTab === "assets" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <section className="rounded-lg border border-stone-200 bg-white p-5">
+              {latestRun ? (
+                <>
+                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                    <div>
+                      <p className="text-sm font-medium uppercase tracking-[0.2em] text-teal-700">
+                        Geracao de assets
+                      </p>
+                      <h2 className="mt-2 text-xl font-semibold">
+                        {latestRun.provider === "MANUS" ? "Manus" : latestRun.provider}
+                      </h2>
+                    </div>
+                    <span className="inline-flex w-fit rounded-full bg-stone-100 px-3 py-1 text-sm font-semibold text-zinc-700">
+                      {formatAssetRunStatus(latestRun.status)}
+                    </span>
+                  </div>
+
+                  <dl className="mt-5 grid gap-3 border-t border-stone-200 pt-5 text-sm sm:grid-cols-4">
+                    <div>
+                      <dt className="text-zinc-500">Provedor</dt>
+                      <dd className="mt-1 font-medium">
+                        {latestRun.provider === "MANUS" ? "Manus" : latestRun.provider}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-zinc-500">Task ID</dt>
+                      <dd className="mt-1 font-medium">{maskProviderTaskId(latestRun.providerTaskId)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-zinc-500">Iniciado em</dt>
+                      <dd className="mt-1 font-medium">{latestRun.startedAt.toLocaleString("pt-BR")}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-zinc-500">Finalizado em</dt>
+                      <dd className="mt-1 font-medium">
+                        {latestRun.finishedAt ? latestRun.finishedAt.toLocaleString("pt-BR") : "em aberto"}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  {runSummaryMessage ? (
+                    <p className="mt-4 rounded-md bg-stone-50 p-4 text-sm leading-6 text-zinc-600">
+                      {runSummaryMessage}
+                    </p>
+                  ) : null}
+
+                  {latestRun.status === "RUNNING" && latestRun.provider === "MANUS" ? (
+                    <form action={syncManusAssetsAction.bind(null, content.id)} className="mt-4">
+                      <SubmitButton pendingLabel="Sincronizando assets..." icon="wand">
+                        Sincronizar assets da Manus
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                </>
+              ) : (
+                <p className="text-sm text-zinc-500">Nenhuma tentativa automatica registrada ainda.</p>
+              )}
+            </section>
+
+            <aside className="space-y-5">
+              <section className="rounded-lg border border-stone-200 bg-white p-5">
+                <h2 className="font-semibold">Midias enviadas</h2>
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <ImageIcon size={16} className="text-teal-700" />
+                      {images.length} imagens
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {images.map((image) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={image.id}
+                          src={toPublicFileUrl(image.path)}
+                          alt={image.originalName}
+                          className="aspect-square rounded-md object-cover"
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {audio ? (
+                    <div className="border-t border-stone-200 pt-4">
+                      <div className="mb-2 flex items-center gap-2 text-sm font-medium">
+                        <Music2 size={16} className="text-teal-700" />
+                        Audio principal
+                      </div>
+                      <div className="mb-3 rounded-md bg-stone-50 p-3 text-sm">
+                        <p className="font-medium text-zinc-900">{audio.originalName}</p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {audio.format.toUpperCase()} · {formatFileSize(audio.size)}
+                        </p>
+                      </div>
+                      <audio controls src={toPublicFileUrl(audio.path)} className="w-full" />
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-stone-200 bg-white p-5">
+                <h2 className="font-semibold">Prompts estruturados</h2>
+                <div className="mt-3 space-y-3 text-sm leading-6 text-zinc-600">
+                  {(Array.isArray(manusPlan?.sceneIdeas) ? manusPlan.sceneIdeas : []).map((idea) => (
+                    <p key={idea}>{idea}</p>
+                  ))}
+                </div>
+              </section>
+            </aside>
+          </div>
+        ) : null}
+
+        {activeTab === "video" ? (
           <section className="rounded-lg border border-stone-200 bg-white p-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-semibold">Video gerado</h2>
@@ -401,19 +637,6 @@ export default async function ContentDetailsPage({
                   {generatedVideo.resolution}
                 </span>
               ) : null}
-            </div>
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <div className="rounded-md bg-stone-50 p-4">
-                <h2 className="text-sm font-semibold">Prompt</h2>
-                <p className="mt-2 text-sm leading-6 text-zinc-600">{content.prompt}</p>
-              </div>
-              <div className="rounded-md bg-stone-50 p-4">
-                <h2 className="text-sm font-semibold">Legenda</h2>
-                <p className="mt-2 text-sm leading-6 text-zinc-600">
-                  {content.caption || "Sem legenda definida."}
-                </p>
-              </div>
             </div>
 
             <div className="mt-6 flex justify-center rounded-lg bg-zinc-950 p-4">
@@ -448,287 +671,61 @@ export default async function ContentDetailsPage({
                 </div>
               </dl>
             ) : null}
-
-            {manusPlan ? (
-              <div className="mt-5 space-y-4 border-t border-stone-200 pt-5">
-                <div>
-                  <h2 className="text-sm font-semibold">Resultados Manus</h2>
-                  <p className="mt-2 text-sm leading-6 text-zinc-600">
-                    {typeof manusPlan.script === "string"
-                      ? manusPlan.script
-                      : "Sem roteiro estruturado salvo."}
-                  </p>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-md bg-stone-50 p-4">
-                    <h3 className="text-sm font-semibold">Caption da postagem</h3>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-600">
-                      {typeof manusPlan.caption === "string"
-                        ? manusPlan.caption
-                        : "Sem caption estruturada salva."}
-                    </p>
-                  </div>
-                  <div className="rounded-md bg-stone-50 p-4">
-                    <h3 className="text-sm font-semibold">Hashtags</h3>
-                    <p className="mt-2 text-sm leading-6 text-zinc-600">
-                      {Array.isArray(manusPlan.hashtags) ? manusPlan.hashtags.join(" ") : ""}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <h3 className="text-sm font-semibold">Ideias de cenas</h3>
-                    <ul className="mt-2 space-y-2 text-sm leading-6 text-zinc-600">
-                      {(Array.isArray(manusPlan.sceneIdeas) ? manusPlan.sceneIdeas : []).map((idea) => (
-                        <li key={idea}>{idea}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">Prompts de imagem</h3>
-                    <ul className="mt-2 space-y-2 text-sm leading-6 text-zinc-600">
-                      {(Array.isArray(manusPlan.imagePrompts) ? manusPlan.imagePrompts : []).map((prompt) => (
-                        <li key={prompt}>{prompt}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </section>
+        ) : null}
 
-          <aside className="space-y-5">
+        {activeTab === "publishing" ? (
+          <section className="grid gap-5 xl:grid-cols-3">
+            <ImmediatePublishingCard
+              title="Instagram Reels"
+              badge="publicacao direta"
+              platform="INSTAGRAM"
+              accounts={instagramAccounts}
+              contentId={content.id}
+              videoReady={Boolean(videoUrl)}
+              defaultCaption={content.caption || ""}
+              pendingLabel="Publicando no Instagram..."
+            />
+            <ImmediatePublishingCard
+              title="TikTok"
+              badge="upload direto"
+              platform="TIKTOK"
+              accounts={tiktokAccounts}
+              contentId={content.id}
+              videoReady={Boolean(videoUrl)}
+              defaultCaption={content.caption || ""}
+              pendingLabel="Publicando no TikTok..."
+              visibilityOptions={[
+                { value: "SELF_ONLY", label: "Somente eu" },
+                { value: "MUTUAL_FOLLOW_FRIENDS", label: "Amigos mutuos" },
+                { value: "FOLLOWER_OF_CREATOR", label: "Seguidores" },
+                { value: "PUBLIC_TO_EVERYONE", label: "Publico" },
+              ]}
+            />
+            <ImmediatePublishingCard
+              title="YouTube Shorts"
+              badge="upload auditavel"
+              platform="YOUTUBE"
+              accounts={youtubeAccounts}
+              contentId={content.id}
+              videoReady={Boolean(videoUrl)}
+              defaultCaption={content.caption || ""}
+              pendingLabel="Publicando no YouTube..."
+              visibilityOptions={[
+                { value: "private", label: "Privado" },
+                { value: "unlisted", label: "Nao listado" },
+                { value: "public", label: "Publico" },
+              ]}
+            />
+          </section>
+        ) : null}
+
+        {activeTab === "schedule" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <section className="rounded-lg border border-stone-200 bg-white p-5">
-              <h2 className="font-semibold">Publicacao imediata</h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-600">
-                Fluxo audit-ready com OAuth oficial para Instagram, TikTok e YouTube.
-              </p>
-              <form
-                action={publishSocialNowAction.bind(null, content.id, "INSTAGRAM")}
-                className="mt-4 space-y-4 rounded-lg border border-stone-200 p-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-medium">Instagram Reels</h3>
-                  <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
-                    publicacao direta
-                  </span>
-                </div>
-                <div>
-                  <label
-                    htmlFor="instagram-social-account"
-                    className="text-sm font-medium text-zinc-800"
-                  >
-                    Conta conectada
-                  </label>
-                  <select
-                    id="instagram-social-account"
-                    name="socialAccountId"
-                    disabled={!videoUrl || instagramAccounts.length === 0}
-                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
-                  >
-                    <option value="">Selecione</option>
-                    {instagramAccounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.accountName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="instagram-caption" className="text-sm font-medium text-zinc-800">
-                    Legenda
-                  </label>
-                  <textarea
-                    id="instagram-caption"
-                    name="caption"
-                    rows={4}
-                    required
-                    disabled={!videoUrl || instagramAccounts.length === 0}
-                    defaultValue={content.caption || ""}
-                    className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6 disabled:bg-stone-100 disabled:text-zinc-400"
-                  />
-                </div>
-
-                <SubmitButton
-                  disabled={!videoUrl || instagramAccounts.length === 0}
-                  fullWidth
-                  icon="wand"
-                  pendingLabel="Publicando no Instagram..."
-                >
-                  Publicar no Instagram agora
-                </SubmitButton>
-                <p className="text-xs leading-5 text-zinc-500">
-                  Instagram exige `PUBLIC_MEDIA_BASE_URL` publico para a API buscar o video.
-                </p>
-              </form>
-
-              <form
-                action={publishSocialNowAction.bind(null, content.id, "TIKTOK")}
-                className="mt-4 space-y-4 rounded-lg border border-stone-200 p-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-medium">TikTok</h3>
-                  <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
-                    upload direto
-                  </span>
-                </div>
-                <div>
-                  <label htmlFor="tiktok-social-account" className="text-sm font-medium text-zinc-800">
-                    Conta conectada
-                  </label>
-                  <select
-                    id="tiktok-social-account"
-                    name="socialAccountId"
-                    disabled={!videoUrl || tiktokAccounts.length === 0}
-                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
-                  >
-                    <option value="">Selecione</option>
-                    {tiktokAccounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.accountName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="tiktok-visibility" className="text-sm font-medium text-zinc-800">
-                    Privacidade
-                  </label>
-                  <select
-                    id="tiktok-visibility"
-                    name="visibility"
-                    disabled={!videoUrl || tiktokAccounts.length === 0}
-                    defaultValue="SELF_ONLY"
-                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
-                  >
-                    <option value="SELF_ONLY">Somente eu</option>
-                    <option value="MUTUAL_FOLLOW_FRIENDS">Amigos mutuos</option>
-                    <option value="FOLLOWER_OF_CREATOR">Seguidores</option>
-                    <option value="PUBLIC_TO_EVERYONE">Publico</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="tiktok-caption" className="text-sm font-medium text-zinc-800">
-                    Legenda
-                  </label>
-                  <textarea
-                    id="tiktok-caption"
-                    name="caption"
-                    rows={4}
-                    required
-                    disabled={!videoUrl || tiktokAccounts.length === 0}
-                    defaultValue={content.caption || ""}
-                    className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6 disabled:bg-stone-100 disabled:text-zinc-400"
-                  />
-                </div>
-
-                <SubmitButton
-                  disabled={!videoUrl || tiktokAccounts.length === 0}
-                  fullWidth
-                  icon="wand"
-                  pendingLabel="Publicando no TikTok..."
-                >
-                  Publicar no TikTok agora
-                </SubmitButton>
-              </form>
-
-              <form
-                action={publishSocialNowAction.bind(null, content.id, "YOUTUBE")}
-                className="mt-4 space-y-4 rounded-lg border border-stone-200 p-4"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-medium">YouTube Shorts</h3>
-                  <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
-                    upload auditavel
-                  </span>
-                </div>
-                <div>
-                  <label htmlFor="youtube-social-account" className="text-sm font-medium text-zinc-800">
-                    Conta conectada
-                  </label>
-                  <select
-                    id="youtube-social-account"
-                    name="socialAccountId"
-                    disabled={!videoUrl || youtubeAccounts.length === 0}
-                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
-                  >
-                    <option value="">Selecione</option>
-                    {youtubeAccounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.accountName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="youtube-visibility" className="text-sm font-medium text-zinc-800">
-                    Visibilidade
-                  </label>
-                  <select
-                    id="youtube-visibility"
-                    name="visibility"
-                    disabled={!videoUrl || youtubeAccounts.length === 0}
-                    defaultValue="private"
-                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
-                  >
-                    <option value="private">Privado</option>
-                    <option value="unlisted">Nao listado</option>
-                    <option value="public">Publico</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="youtube-caption" className="text-sm font-medium text-zinc-800">
-                    Descricao
-                  </label>
-                  <textarea
-                    id="youtube-caption"
-                    name="caption"
-                    rows={4}
-                    required
-                    disabled={!videoUrl || youtubeAccounts.length === 0}
-                    defaultValue={content.caption || ""}
-                    className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6 disabled:bg-stone-100 disabled:text-zinc-400"
-                  />
-                </div>
-
-                <SubmitButton
-                  disabled={!videoUrl || youtubeAccounts.length === 0}
-                  fullWidth
-                  icon="wand"
-                  pendingLabel="Publicando no YouTube..."
-                >
-                  Publicar no YouTube agora
-                </SubmitButton>
-              </form>
-              {!videoUrl ? (
-                <p className="mt-3 text-xs leading-5 text-zinc-500">
-                  Gere o video antes de publicar.
-                </p>
-              ) : null}
-              {instagramAccounts.length === 0 ||
-              tiktokAccounts.length === 0 ||
-              youtubeAccounts.length === 0 ? (
-                <p className="mt-3 text-xs leading-5 text-zinc-500">
-                  Conecte as contas desejadas em /settings para habilitar a publicacao por rede.
-                </p>
-              ) : null}
-            </section>
-
-            <section
-              id="schedule-post"
-              className="rounded-lg border border-stone-200 bg-white p-5"
-            >
               <h2 className="font-semibold">Agendar postagem</h2>
               <p className="mt-2 text-sm leading-6 text-zinc-600">
-                Salve plataforma, conta, data, horario e caption. A publicacao sera tentada quando
-                o agendamento for processado.
+                Salve plataforma, conta, data, horario e caption. A publicacao sera tentada quando o agendamento for processado.
               </p>
               <form action={schedulePostAction} className="mt-4 space-y-4">
                 <input type="hidden" name="projectId" value={content.id} />
@@ -738,7 +735,7 @@ export default async function ContentDetailsPage({
                     Plataforma
                   </label>
                   <select
-                    id="platform"
+                    id="schedule-platform"
                     name="platform"
                     disabled={!videoUrl}
                     defaultValue="INSTAGRAM"
@@ -750,7 +747,7 @@ export default async function ContentDetailsPage({
                   </select>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label htmlFor="date" className="text-sm font-medium text-zinc-800">
                       Data
@@ -785,14 +782,18 @@ export default async function ContentDetailsPage({
                     Conta conectada
                   </label>
                   <select
-                    id="social-account"
+                    id="schedule-social-account"
                     name="socialAccountId"
                     disabled={!videoUrl}
                     className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
                   >
                     <option value="">Escolher depois</option>
                     {socialAccounts.filter((account) => account.isActive).map((account) => (
-                      <option key={account.id} value={account.id}>
+                      <option
+                        key={account.id}
+                        value={account.id}
+                        data-platform={account.platform}
+                      >
                         {account.platformLabel} · {account.accountName}
                       </option>
                     ))}
@@ -845,66 +846,230 @@ export default async function ContentDetailsPage({
                   Salvar agendamento
                 </SubmitButton>
               </form>
-
-              {!videoUrl ? (
-                <p className="mt-3 text-xs leading-5 text-zinc-500">
-                  Gere o video antes de salvar um agendamento.
-                </p>
-              ) : null}
             </section>
 
-            <section className="rounded-lg border border-stone-200 bg-white p-5">
-              <h2 className="font-semibold">Midias enviadas</h2>
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <ImageIcon size={16} className="text-teal-700" />
-                  {images.length} imagens
-                </div>
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-3">
-                  {images.map((image) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={image.id}
-                      src={toPublicFileUrl(image.path)}
-                      alt={image.originalName}
-                      className="aspect-square rounded-md object-cover"
-                    />
-                  ))}
-                </div>
-
-                {audio ? (
-                  <div className="border-t border-stone-200 pt-4">
-                    <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                      <Music2 size={16} className="text-teal-700" />
-                      Audio
-                    </div>
-                    <div className="mb-3 rounded-md bg-stone-50 p-3 text-sm">
-                      <p className="font-medium text-zinc-900">{audio.originalName}</p>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        {audio.format.toUpperCase()} · {formatFileSize(audio.size)}
-                      </p>
-                    </div>
-                    <audio controls src={toPublicFileUrl(audio.path)} className="w-full" />
-                  </div>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="rounded-lg border border-stone-200 bg-white p-5">
-              <h2 className="font-semibold">Legenda</h2>
-              <div className="mt-3">
-                {shouldReviewCaption && content.caption ? (
-                  <CaptionReviewForm contentId={content.id} caption={content.caption} />
+            <aside className="rounded-lg border border-stone-200 bg-white p-5">
+              <h2 className="font-semibold">Ultimos agendamentos</h2>
+              <div className="mt-4 space-y-4">
+                {content.scheduledPosts.length === 0 ? (
+                  <p className="text-sm text-zinc-500">Nenhum agendamento salvo ainda.</p>
                 ) : (
-                  <p className="whitespace-pre-wrap text-sm leading-6 text-zinc-600">
-                    {content.caption || "Sem legenda definida."}
-                  </p>
+                  content.scheduledPosts.map((post) => (
+                    <div key={post.id} className="rounded-lg border border-stone-200 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                          {post.platform.toLowerCase()}
+                        </span>
+                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                          {post.status.toLowerCase()}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-medium text-zinc-900">
+                        {formatDateTime(post.scheduledAt).date} {formatDateTime(post.scheduledAt).time}
+                      </p>
+                      <p className="mt-2 text-xs text-zinc-500">
+                        {post.socialAccount?.accountName ?? "Conta nao definida"}
+                      </p>
+                      {post.publishErrorMessage ? (
+                        <p className="mt-2 text-xs text-red-700">{post.publishErrorMessage}</p>
+                      ) : null}
+                    </div>
+                  ))
+                )}
+              </div>
+            </aside>
+          </div>
+        ) : null}
+
+        {activeTab === "logs" ? (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <section className="rounded-lg border border-stone-200 bg-white p-5">
+              <h2 className="font-semibold">Job runs recentes</h2>
+              <div className="mt-4 space-y-4">
+                {content.jobRuns.length === 0 ? (
+                  <p className="text-sm text-zinc-500">Nenhum job run registrado ainda.</p>
+                ) : (
+                  content.jobRuns.map((jobRun) => (
+                    <article key={jobRun.id} className="rounded-lg border border-stone-200 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                          {jobRun.name}
+                        </span>
+                        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                          {renderJobRunStatus(jobRun.status)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-zinc-500">
+                        {jobRun.createdAt.toLocaleString("pt-BR")}
+                      </p>
+                      {jobRun.errorMessage ? (
+                        <p className="mt-2 text-sm text-red-700">{jobRun.errorMessage}</p>
+                      ) : null}
+                      {jobRun.logs.length > 0 ? (
+                        <div className="mt-3 space-y-2 border-t border-stone-200 pt-3">
+                          {jobRun.logs.map((log) => (
+                            <div key={log.id} className="rounded-md bg-stone-50 p-3">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                                {log.level}
+                              </p>
+                              <p className="mt-1 text-sm leading-6 text-zinc-600">{log.message}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </article>
+                  ))
                 )}
               </div>
             </section>
-          </aside>
-        </div>
+
+            <aside className="space-y-5">
+              <section className="rounded-lg border border-stone-200 bg-white p-5">
+                <h2 className="font-semibold">Ultima sincronizacao Manus</h2>
+                <div className="mt-4 space-y-2 text-sm leading-6 text-zinc-600">
+                  <p>Status: {latestRun ? formatAssetRunStatus(latestRun.status) : "sem run"}</p>
+                  <p>Task: {maskProviderTaskId(latestRun?.providerTaskId)}</p>
+                  <p>{runSummaryMessage ?? "Sem resumo salvo."}</p>
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-stone-200 bg-white p-5">
+                <h2 className="font-semibold">Arquivos auxiliares</h2>
+                <div className="mt-4 space-y-3">
+                  {subtitles.length === 0 ? (
+                    <p className="text-sm text-zinc-500">Nenhum subtitle salvo ainda.</p>
+                  ) : (
+                    subtitles.map((subtitle) => (
+                      <a
+                        key={subtitle.id}
+                        href={toPublicFileUrl(subtitle.path)}
+                        className="flex items-center gap-2 rounded-md border border-stone-200 p-3 text-sm font-medium text-zinc-900 hover:bg-stone-50"
+                      >
+                        <FileAudio size={14} />
+                        {subtitle.originalName}
+                      </a>
+                    ))
+                  )}
+                </div>
+              </section>
+            </aside>
+          </div>
+        ) : null}
       </div>
     </AppShell>
+  );
+}
+
+function ImmediatePublishingCard({
+  title,
+  badge,
+  platform,
+  accounts,
+  contentId,
+  videoReady,
+  defaultCaption,
+  pendingLabel,
+  visibilityOptions,
+}: {
+  title: string;
+  badge: string;
+  platform: "INSTAGRAM" | "TIKTOK" | "YOUTUBE";
+  accounts: Array<{ id: string; accountName: string }>;
+  contentId: string;
+  videoReady: boolean;
+  defaultCaption: string;
+  pendingLabel: string;
+  visibilityOptions?: Array<{ value: string; label: string }>;
+}) {
+  const selectId = `${platform.toLowerCase()}-social-account`;
+  const captionId = `${platform.toLowerCase()}-caption`;
+  const visibilityId = `${platform.toLowerCase()}-visibility`;
+
+  return (
+    <form
+      action={publishSocialNowAction.bind(null, contentId, platform)}
+      className="space-y-4 rounded-lg border border-stone-200 bg-white p-5"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold">{title}</h2>
+        <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+          {badge}
+        </span>
+      </div>
+
+      <div>
+        <label htmlFor={selectId} className="text-sm font-medium text-zinc-800">
+          Conta conectada
+        </label>
+        <select
+          id={selectId}
+          name="socialAccountId"
+          data-social-platform={platform}
+          disabled={!videoReady || accounts.length === 0}
+          className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+        >
+          <option value="">Selecione</option>
+          {accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.accountName}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {visibilityOptions ? (
+        <div>
+          <label htmlFor={visibilityId} className="text-sm font-medium text-zinc-800">
+            Visibilidade
+          </label>
+          <select
+            id={visibilityId}
+            name="visibility"
+            disabled={!videoReady || accounts.length === 0}
+            defaultValue={visibilityOptions[0]?.value}
+            className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+          >
+            {visibilityOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
+      <div>
+        <label htmlFor={captionId} className="text-sm font-medium text-zinc-800">
+          Legenda
+        </label>
+        <textarea
+          id={captionId}
+          name="caption"
+          rows={4}
+          required
+          disabled={!videoReady || accounts.length === 0}
+          defaultValue={defaultCaption}
+          className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6 disabled:bg-stone-100 disabled:text-zinc-400"
+        />
+      </div>
+
+      <SubmitButton
+        disabled={!videoReady || accounts.length === 0}
+        fullWidth
+        icon="wand"
+        pendingLabel={pendingLabel}
+      >
+        Publicar agora
+      </SubmitButton>
+
+      {!videoReady ? (
+        <p className="text-xs leading-5 text-zinc-500">Gere o video antes de publicar.</p>
+      ) : null}
+      {accounts.length === 0 ? (
+        <p className="text-xs leading-5 text-zinc-500">
+          Conecte uma conta em /settings para habilitar esta publicacao.
+        </p>
+      ) : null}
+    </form>
   );
 }

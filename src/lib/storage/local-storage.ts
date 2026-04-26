@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { generatedRoot, storageRoot, uploadRoot } from "@/lib/paths";
+import { generatedRoot, resolvedStorageRoot, uploadRoot } from "@/lib/paths";
 
 export type StoredFile = {
   fileName: string;
@@ -22,13 +22,13 @@ export async function ensureStorageFolders() {
 export async function saveUploadedFile(file: File, namespace: string): Promise<StoredFile> {
   await ensureStorageFolders();
 
-  const folder = path.join(uploadRoot, namespace);
+  const folder = path.join(/*turbopackIgnore: true*/ uploadRoot, namespace);
   await fs.mkdir(folder, { recursive: true });
 
   const originalName = file.name || "upload.bin";
   const cleanName = sanitizeFileName(originalName);
   const fileName = `${randomUUID()}-${cleanName}`;
-  const destination = path.join(folder, fileName);
+  const destination = path.join(/*turbopackIgnore: true*/ folder, fileName);
   const bytes = Buffer.from(await file.arrayBuffer());
 
   await fs.writeFile(destination, bytes);
@@ -49,12 +49,12 @@ export async function saveGeneratedAsset(
 ): Promise<StoredFile> {
   await ensureStorageFolders();
 
-  const folder = path.join(uploadRoot, namespace);
+  const folder = path.join(/*turbopackIgnore: true*/ uploadRoot, namespace);
   await fs.mkdir(folder, { recursive: true });
 
   const cleanName = sanitizeFileName(fileName || "generated-asset.bin");
   const storedName = `${randomUUID()}-${cleanName}`;
-  const destination = path.join(folder, storedName);
+  const destination = path.join(/*turbopackIgnore: true*/ folder, storedName);
 
   await fs.writeFile(destination, bytes);
 
@@ -70,15 +70,15 @@ export async function getGeneratedVideoPath(contentId: string, generatedVideoId?
   await ensureStorageFolders();
 
   if (generatedVideoId) {
-    return path.join(generatedRoot, contentId, `${generatedVideoId}.mp4`);
+    return path.join(/*turbopackIgnore: true*/ generatedRoot, contentId, `${generatedVideoId}.mp4`);
   }
 
-  return path.join(generatedRoot, `${contentId}.mp4`);
+  return path.join(/*turbopackIgnore: true*/ generatedRoot, `${contentId}.mp4`);
 }
 
 function assertStoragePath(filePath: string) {
-  const resolvedPath = path.resolve(filePath);
-  const relativePath = path.relative(storageRoot, resolvedPath);
+  const resolvedPath = path.resolve(/*turbopackIgnore: true*/ filePath);
+  const relativePath = path.relative(resolvedStorageRoot, resolvedPath);
 
   if (relativePath.startsWith("..") || path.isAbsolute(relativePath) || relativePath === "") {
     throw new Error("Caminho de storage invalido para exclusao.");
@@ -88,9 +88,9 @@ function assertStoragePath(filePath: string) {
 }
 
 export async function deleteProjectStorage(projectId: string, generatedVideoPaths: string[] = []) {
-  const uploadFolder = path.join(uploadRoot, projectId);
+  const uploadFolder = path.join(/*turbopackIgnore: true*/ uploadRoot, projectId);
   const generatedPaths = new Set([
-    path.join(generatedRoot, `${projectId}.mp4`),
+    path.join(/*turbopackIgnore: true*/ generatedRoot, `${projectId}.mp4`),
     ...generatedVideoPaths.filter(Boolean),
   ]);
 

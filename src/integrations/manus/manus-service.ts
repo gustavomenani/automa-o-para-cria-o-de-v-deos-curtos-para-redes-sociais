@@ -147,14 +147,21 @@ function isTaskNotFoundError(error: unknown) {
 }
 
 export async function writeStoredManusPlan(projectId: string, plan: ManusStoredPlan) {
-  const folder = path.join(uploadRoot, projectId);
+  const folder = path.join(/*turbopackIgnore: true*/ uploadRoot, projectId);
   await fs.mkdir(folder, { recursive: true });
-  await fs.writeFile(path.join(folder, "manus-plan.json"), JSON.stringify(plan, null, 2), "utf8");
+  await fs.writeFile(
+    path.join(/*turbopackIgnore: true*/ folder, "manus-plan.json"),
+    JSON.stringify(plan, null, 2),
+    "utf8",
+  );
 }
 
 export async function readStoredManusPlan(projectId: string): Promise<ManusStoredPlan | null> {
   try {
-    const content = await fs.readFile(path.join(uploadRoot, projectId, "manus-plan.json"), "utf8");
+    const content = await fs.readFile(
+      path.join(/*turbopackIgnore: true*/ uploadRoot, projectId, "manus-plan.json"),
+      "utf8",
+    );
     const parsed = JSON.parse(content);
 
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {

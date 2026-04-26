@@ -1,5 +1,4 @@
 import { getCurrentUser } from "@/features/auth/session";
-import { syncPendingManusRunForProject } from "@/features/content/services/ai-asset-orchestrator";
 import { prisma } from "@/lib/prisma";
 import { apiCreated, apiError } from "@/lib/api-response";
 
@@ -26,6 +25,9 @@ export async function POST(
       return apiError(new Error("Voce nao tem acesso a este conteudo."), "Acesso negado.", 403);
     }
 
+    const { syncPendingManusRunForProject } = await import(
+      "@/features/content/services/ai-asset-orchestrator"
+    );
     const result = await syncPendingManusRunForProject(id);
     return apiCreated(result);
   } catch (error) {

@@ -5,31 +5,51 @@ import { SubmitButton } from "@/components/submit-button";
 import {
   disconnectSocialAccountAction,
   saveManusSettingsAction,
+  validateSocialAccountAction,
 } from "@/features/settings/actions";
+import { SocialAccountDefaults } from "@/features/settings/components/social-account-defaults";
 import {
   getConnectedSocialAccounts,
+  getEnvironmentHealth,
   getManusSettings,
 } from "@/features/settings/queries";
 import { requireUser } from "@/features/auth/session";
 
 export const dynamic = "force-dynamic";
 
+function decodeFeedbackMessage(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export default async function SettingsPage({
   searchParams,
 }: {
   searchParams: Promise<{
     saved?: string;
+    settingsError?: string;
     instagramConnected?: string;
     tiktokConnected?: string;
     youtubeConnected?: string;
     socialDisconnected?: string;
+    socialValidated?: string;
     socialError?: string;
   }>;
 }) {
   const feedback = await searchParams;
+  const socialErrorMessage = decodeFeedbackMessage(feedback.socialError);
+  const settingsErrorMessage = decodeFeedbackMessage(feedback.settingsError);
   await requireUser();
   const manusSettings = await getManusSettings();
   const socialAccounts = await getConnectedSocialAccounts();
+  const healthChecks = await getEnvironmentHealth();
 
   return (
     <AppShell>
@@ -50,6 +70,14 @@ export default async function SettingsPage({
             type="success"
             title="Configuracoes salvas"
             message="As preferencias foram atualizadas no banco local."
+          />
+        ) : null}
+
+        {settingsErrorMessage ? (
+          <FeedbackBanner
+            type="error"
+            title="Nao foi possivel salvar configuracoes"
+            message={settingsErrorMessage}
           />
         ) : null}
 
@@ -85,11 +113,19 @@ export default async function SettingsPage({
           />
         ) : null}
 
-        {feedback.socialError ? (
+        {feedback.socialValidated ? (
+          <FeedbackBanner
+            type="success"
+            title="Conta validada"
+            message="A conta foi reavaliada com base no token salvo e no estado atual do cadastro."
+          />
+        ) : null}
+
+        {socialErrorMessage ? (
           <FeedbackBanner
             type="error"
             title="Falha ao conectar conta"
-            message={decodeURIComponent(feedback.socialError)}
+            message={socialErrorMessage}
           />
         ) : null}
 
@@ -195,24 +231,63 @@ export default async function SettingsPage({
                           ? `Token expira em ${account.tokenExpiresAt.toLocaleString("pt-BR")}.`
                           : "Token sem expiracao conhecida."}
                     </p>
+                    {account.lastValidatedAt ? (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        Ultima validacao: {account.lastValidatedAt.toLocaleString("pt-BR")}
+                      </p>
+                    ) : null}
+                    {Array.isArray(account.scopes) && account.scopes.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {account.scopes.map((scope) => (
+                          <span
+                            key={String(scope)}
+                            className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700"
+                          >
+                            {String(scope)}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     {account.tokenErrorMessage ? (
                       <p className="mt-1 text-sm text-red-700">{account.tokenErrorMessage}</p>
                     ) : null}
                   </div>
 
-                  <form action={disconnectSocialAccountAction}>
-                    <input type="hidden" name="socialAccountId" value={account.id} />
-                    <SubmitButton pendingLabel="Desconectando..." variant="secondary">
-                      Desconectar
-                    </SubmitButton>
-                  </form>
+                  <div className="flex gap-2">
+                    <form action={validateSocialAccountAction}>
+                      <input type="hidden" name="socialAccountId" value={account.id} />
+                      <SubmitButton pendingLabel="Validando..." variant="secondary">
+                        Validar conta
+                      </SubmitButton>
+                    </form>
+                    <form action={disconnectSocialAccountAction}>
+                      <input type="hidden" name="socialAccountId" value={account.id} />
+                      <SubmitButton pendingLabel="Desconectando..." variant="secondary">
+                        Desconectar
+                      </SubmitButton>
+                    </form>
+                  </div>
                 </article>
               ))}
             </div>
           )}
         </section>
 
+        <SocialAccountDefaults accounts={socialAccounts} />
+
         <form action={saveManusSettingsAction} className="space-y-6">
+          <section className="rounded-lg border border-stone-200 bg-white p-5">
+            <div className="flex items-center gap-3">
+              <Settings size={18} className="text-teal-700" />
+              <div>
+                <h2 className="font-semibold">Configuracao basica</h2>
+                <p className="mt-1 text-sm leading-6 text-zinc-600">
+                  Mantem a chave da Manus, o modelo preferido e as diretrizes principais de geracao.
+                </p>
+              </div>
+            </div>
+          </section>
+
           <section className="rounded-lg border border-stone-200 bg-white p-5">
             <div className="flex items-center gap-3">
               <KeyRound size={18} className="text-teal-700" />
@@ -238,6 +313,9 @@ export default async function SettingsPage({
                 <p className="mt-2 text-xs leading-5 text-zinc-500">
                   A chave e usada somente no servidor. No MVP fica salva no banco local; em
                   producao, mova para secret manager.
+                </p>
+                <p className="mt-2 text-xs leading-5 text-zinc-500">
+                  Para rotacao segura, preencha uma nova chave apenas quando quiser substituir a atual.
                 </p>
               </div>
 
@@ -267,6 +345,18 @@ export default async function SettingsPage({
                 placeholder="Diretrizes padrao para orientar tarefas futuras da Manus."
                 className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6"
               />
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-stone-200 bg-white p-5">
+            <div className="flex items-center gap-3">
+              <ShieldCheck size={18} className="text-teal-700" />
+              <div>
+                <h2 className="font-semibold">Configuracao avancada</h2>
+                <p className="mt-1 text-sm leading-6 text-zinc-600">
+                  Ajusta duracao e estilo base por formato e impacta a orientacao passada para a Manus.
+                </p>
+              </div>
             </div>
           </section>
 
@@ -348,22 +438,25 @@ export default async function SettingsPage({
         <section className="rounded-lg border border-stone-200 bg-white p-5">
           <div className="flex items-center gap-3">
             <Settings size={18} className="text-teal-700" />
-            <h2 className="font-semibold">Ambiente local</h2>
+            <h2 className="font-semibold">Health check do ambiente</h2>
           </div>
-          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-            <div>
-              <dt className="text-zinc-500">Banco</dt>
-              <dd className="mt-1 font-medium">PostgreSQL via Docker</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">Storage</dt>
-              <dd className="mt-1 font-medium">Local</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500">Video</dt>
-              <dd className="mt-1 font-medium">FFmpeg</dd>
-            </div>
-          </dl>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {healthChecks.map((check) => (
+              <div key={check.label} className="rounded-lg border border-stone-200 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-zinc-900">{check.label}</p>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                      check.ok ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {check.ok ? "OK" : "Ajustar"}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-zinc-600">{check.detail}</p>
+              </div>
+            ))}
+          </div>
         </section>
       </div>
     </AppShell>

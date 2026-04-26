@@ -15,7 +15,7 @@ const statusLabels: Record<AssetGenerationStatus, string> = {
 };
 
 export function formatProviderName(provider: AssetProvider) {
-  return provider === "MANUS" ? "Manus" : "Gemini";
+  return provider === "MANUS" ? "Manus" : provider.toLowerCase();
 }
 
 export function formatAssetRunStatus(status: AssetGenerationStatus) {
@@ -66,7 +66,7 @@ export function getDisplaySafeMessage(message: string, fallback: string) {
     ) ||
     /\bat\s+\S+\s+\(/.test(trimmed) ||
     /([A-Z]:\\|\/Users\/|\/home\/|storage[\\/]|\.env)/i.test(trimmed) ||
-    /(AIza[0-9A-Za-z_-]{20,}|MANUS_API_KEY|GEMINI_API_KEY=|sk-[0-9A-Za-z_-]{20,})/.test(
+    /(MANUS_API_KEY|sk-[0-9A-Za-z_-]{20,})/.test(
       trimmed,
     )
   ) {

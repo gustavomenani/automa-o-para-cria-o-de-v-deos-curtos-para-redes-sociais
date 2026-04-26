@@ -7,10 +7,6 @@ import {
   createProjectWithUploads,
   parseProjectFormData,
 } from "@/features/content/services/upload-service";
-import {
-  runAssetPipelineForProject,
-  syncPendingManusRunForProject,
-} from "@/features/content/services/ai-asset-orchestrator";
 import { requireUser } from "@/features/auth/session";
 import { publishProjectNow } from "@/integrations/social/publish-orchestrator";
 import { socialPlatformLabels } from "@/integrations/social/social-platforms";
@@ -41,7 +37,7 @@ function looksInternalOrSensitive(message: string) {
     /\b(ffmpeg|ffprobe|stderr|stdout|spawn|traceback|stack|node_modules|libx264)\b/i.test(message) ||
     /\bat\s+\S+\s+\(/.test(message) ||
     /([A-Z]:\\|\/Users\/|\/home\/|storage[\\/]|\.env)/i.test(message) ||
-    /(AIza[0-9A-Za-z_-]{20,}|MANUS_API_KEY|GEMINI_API_KEY=|sk-[0-9A-Za-z_-]{20,})/.test(message)
+    /(MANUS_API_KEY|sk-[0-9A-Za-z_-]{20,})/.test(message)
   );
 }
 
@@ -100,6 +96,9 @@ export async function createContentAction(formData: FormData) {
     let targetUrl = `/contents/${content.id}?manus=1`;
 
     try {
+      const { runAssetPipelineForProject } = await import(
+        "@/features/content/services/ai-asset-orchestrator"
+      );
       const result = await runAssetPipelineForProject({
         projectId: content.id,
         prompt: input.prompt,
@@ -107,12 +106,17 @@ export async function createContentAction(formData: FormData) {
 
       const canGenerateVideo = result.images.length > 0 && Boolean(result.audio);
       const params = new URLSearchParams({ manus: "1" });
+      const manusWarnings = result.warnings.length > 0 ? result.warnings.join(" | ") : null;
+      let videoGenerated = false;
+      let videoGenerationFailed = false;
 
       if (canGenerateVideo) {
         try {
           await videoService.generateProjectVideo(content.id);
+          videoGenerated = true;
           params.set("generated", "1");
         } catch (error) {
+          videoGenerationFailed = true;
           params.set(
             "videoWarning",
             friendlyErrorMessage(error, "Assets gerados, mas o video nao foi criado."),
@@ -125,13 +129,31 @@ export async function createContentAction(formData: FormData) {
         );
       }
 
-      await prisma.contentProject.update({
-        where: { id: content.id },
-        data: {
-          status: result.status === "FAILED" || result.status === "MANUAL_ACTION_REQUIRED" ? "ERROR" : "DRAFT",
-          errorMessage: result.warnings.length > 0 ? result.warnings.join(" | ") : null,
-        },
-      });
+      const updateData: {
+        status?: "DRAFT" | "READY" | "ERROR";
+        errorMessage?: string | null;
+      } = {};
+
+      if (result.status === "FAILED" || result.status === "MANUAL_ACTION_REQUIRED") {
+        updateData.status = "ERROR";
+        updateData.errorMessage = manusWarnings;
+      } else if (videoGenerated) {
+        updateData.status = "READY";
+
+        if (manusWarnings) {
+          updateData.errorMessage = manusWarnings;
+        }
+      } else if (!videoGenerationFailed) {
+        updateData.status = "DRAFT";
+        updateData.errorMessage = manusWarnings;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await prisma.contentProject.update({
+          where: { id: content.id },
+          data: updateData,
+        });
+      }
 
       await revalidateContentPages(content.id);
       targetUrl = `/contents/${content.id}?${params.toString()}`;
@@ -205,6 +227,9 @@ export async function syncManusAssetsAction(contentId: string) {
 
   try {
     await assertOwnedContent(contentId, user.id);
+    const { syncPendingManusRunForProject } = await import(
+      "@/features/content/services/ai-asset-orchestrator"
+    );
     const synced = await syncPendingManusRunForProject(contentId);
     completed = synced.completed;
 

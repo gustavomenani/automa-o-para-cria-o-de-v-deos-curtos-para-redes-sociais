@@ -16,9 +16,13 @@ const manusSettingsSchema = z.object({
   storiesStyle: z.string().trim().optional(),
 });
 
+function redirectWithSettingsError(message: string): never {
+  redirect(`/settings?settingsError=${encodeURIComponent(message)}`);
+}
+
 export async function saveManusSettingsAction(formData: FormData) {
   const user = await requireUser();
-  const parsed = manusSettingsSchema.parse({
+  const parsed = manusSettingsSchema.safeParse({
     apiKey: formData.get("apiKey") || undefined,
     modelPreference: formData.get("modelPreference") || undefined,
     promptPreference: formData.get("promptPreference") || undefined,
@@ -28,23 +32,30 @@ export async function saveManusSettingsAction(formData: FormData) {
     storiesStyle: formData.get("storiesStyle") || undefined,
   });
 
+  if (!parsed.success) {
+    redirectWithSettingsError(
+      parsed.error.issues[0]?.message || "Nao foi possivel validar as configuracoes.",
+    );
+  }
+
   const existing = await prisma.manusSettings.findUnique({
     where: { userId: user.id },
   });
+  const values = parsed.data;
 
   const data = {
-    apiKey: parsed.apiKey || existing?.apiKey || null,
-    modelPreference: parsed.modelPreference || null,
-    promptPreference: parsed.promptPreference || null,
+    apiKey: values.apiKey || existing?.apiKey || null,
+    modelPreference: values.modelPreference || null,
+    promptPreference: values.promptPreference || null,
     defaultReelsConfig: {
-      durationSeconds: parsed.reelsDuration,
-      style: parsed.reelsStyle || "",
+      durationSeconds: values.reelsDuration,
+      style: values.reelsStyle || "",
       format: "reels",
       aspectRatio: "9:16",
     },
     defaultStoriesConfig: {
-      durationSeconds: parsed.storiesDuration,
-      style: parsed.storiesStyle || "",
+      durationSeconds: values.storiesDuration,
+      style: values.storiesStyle || "",
       format: "story",
       aspectRatio: "9:16",
     },
@@ -68,7 +79,7 @@ export async function disconnectSocialAccountAction(formData: FormData) {
     redirect("/settings?socialError=Conta%20social%20invalida.");
   }
 
-  await prisma.socialAccount.updateMany({
+  const result = await prisma.socialAccount.updateMany({
     where: {
       id: socialAccountId,
       userId: user.id,
@@ -84,6 +95,59 @@ export async function disconnectSocialAccountAction(formData: FormData) {
     },
   });
 
+  if (result.count === 0) {
+    redirect("/settings?socialError=Conta%20social%20invalida.");
+  }
+
   revalidatePath("/settings");
   redirect("/settings?socialDisconnected=1");
+}
+
+export async function validateSocialAccountAction(formData: FormData) {
+  const user = await requireUser();
+  const socialAccountId = String(formData.get("socialAccountId") ?? "").trim();
+
+  if (!socialAccountId) {
+    redirect("/settings?socialError=Conta%20social%20invalida.");
+  }
+
+  const socialAccount = await prisma.socialAccount.findFirst({
+    where: {
+      id: socialAccountId,
+      userId: user.id,
+    },
+    select: {
+      id: true,
+      reauthRequired: true,
+      isActive: true,
+      accessTokenCiphertext: true,
+      tokenExpiresAt: true,
+    },
+  });
+
+  if (!socialAccount) {
+    redirect("/settings?socialError=Conta%20social%20invalida.");
+  }
+
+  const errorMessage = !socialAccount.isActive
+    ? "Conta inativa."
+    : socialAccount.reauthRequired
+      ? "Conta exige reconexao."
+      : !socialAccount.accessTokenCiphertext
+        ? "Token de acesso ausente."
+        : socialAccount.tokenExpiresAt && socialAccount.tokenExpiresAt.getTime() <= Date.now()
+          ? "Token expirado."
+          : null;
+
+  await prisma.socialAccount.update({
+    where: { id: socialAccount.id },
+    data: {
+      lastValidatedAt: new Date(),
+      tokenErrorMessage: errorMessage,
+      status: errorMessage ? "attention" : "active",
+    },
+  });
+
+  revalidatePath("/settings");
+  redirect(errorMessage ? `/settings?socialError=${encodeURIComponent(errorMessage)}` : "/settings?socialValidated=1");
 }

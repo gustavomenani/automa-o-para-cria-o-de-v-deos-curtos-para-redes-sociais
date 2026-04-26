@@ -47,7 +47,6 @@ const DEFAULT_GLOSSARY = new Set([
   "shorts",
   "instagram",
   "manus",
-  "gemini",
   "ia",
   "automacao",
   "hashtag",

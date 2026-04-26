@@ -5,7 +5,10 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/features/auth/session";
-import { publishDueScheduledPosts } from "@/integrations/social/publish-orchestrator";
+import {
+  publishDueScheduledPosts,
+  publishScheduledPostNow,
+} from "@/integrations/social/publish-orchestrator";
 import {
   SCHEDULE_PAST_DATE_ERROR,
   assertFutureSchedule,
@@ -150,4 +153,109 @@ export async function processDueScheduledPostsAction() {
   revalidatePath("/schedule");
   revalidatePath("/contents");
   redirect("/schedule?processed=1");
+}
+
+export async function retryScheduledPostAction(formData: FormData) {
+  const user = await requireUser();
+  const scheduledPostId = String(formData.get("scheduledPostId") ?? "").trim();
+
+  if (!scheduledPostId) {
+    redirect("/schedule?retryError=Agendamento%20invalido.");
+  }
+
+  const scheduledPost = await prisma.scheduledPost.findFirst({
+    where: {
+      id: scheduledPostId,
+      status: "FAILED",
+      project: {
+        userId: user.id,
+      },
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!scheduledPost) {
+    redirect("/schedule?retryError=Agendamento%20nao%20encontrado.");
+  }
+
+  await prisma.scheduledPost.update({
+    where: { id: scheduledPost.id },
+    data: {
+      status: "SCHEDULED",
+      publishAttemptedAt: null,
+      publishedAt: null,
+      publishErrorCode: null,
+      publishErrorMessage: null,
+      providerPostId: null,
+      providerStatus: null,
+    },
+  });
+
+  try {
+    await publishScheduledPostNow(scheduledPost.id);
+  } catch (error) {
+    await prisma.scheduledPost.update({
+      where: { id: scheduledPost.id },
+      data: {
+        status: "FAILED",
+        publishAttemptedAt: new Date(),
+        publishErrorMessage: normalizeSafeError(
+          error,
+          "Nao foi possivel repetir a publicacao agora.",
+        ),
+      },
+    });
+
+    revalidatePath("/schedule");
+    revalidatePath("/contents");
+    redirect(
+      `/schedule?retryError=${encodeURIComponent(
+        normalizeSafeError(error, "Nao foi possivel repetir a publicacao agora."),
+      )}`,
+    );
+  }
+
+  revalidatePath("/schedule");
+  revalidatePath("/contents");
+  redirect("/schedule?retried=1");
+}
+
+export async function retryFailedScheduledPostsAction() {
+  const user = await requireUser();
+  const failedPosts = await prisma.scheduledPost.findMany({
+    where: {
+      status: "FAILED",
+      project: {
+        userId: user.id,
+      },
+    },
+    select: {
+      id: true,
+    },
+    orderBy: { scheduledAt: "asc" },
+    take: 20,
+  });
+
+  for (const post of failedPosts) {
+    await prisma.scheduledPost.update({
+      where: { id: post.id },
+      data: {
+        status: "SCHEDULED",
+        publishAttemptedAt: null,
+        publishedAt: null,
+        publishErrorCode: null,
+        publishErrorMessage: null,
+        providerPostId: null,
+        providerStatus: null,
+      },
+    });
+  }
+
+  await publishDueScheduledPosts(user.id);
+
+  revalidatePath("/schedule");
+  revalidatePath("/contents");
+  redirect("/schedule?bulkRetried=1");
 }

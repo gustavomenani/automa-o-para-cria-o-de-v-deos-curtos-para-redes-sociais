@@ -15,9 +15,46 @@ import type { AssetProvider, AssetGenerationStatus, Prisma } from "@prisma/clien
 import path from "node:path";
 import fs from "node:fs/promises";
 
+const MIN_MANUS_IMAGE_COUNT = 8;
+const MAX_MANUS_IMAGE_COUNT = 10;
+const MAX_MANUS_AUDIO_SECONDS = 110;
+
 function toFormat(fileName: string, mimeType: string) {
   const extension = path.extname(fileName).replace(".", "");
   return extension || mimeType.split("/").at(1)?.split(";").at(0) || "bin";
+}
+
+async function validateManusAssetPackage(
+  manusResult: Awaited<ReturnType<typeof manusService.getNormalizedTaskResult>>,
+) {
+  const imageCount = manusResult.assets.images.length;
+
+  if (imageCount < MIN_MANUS_IMAGE_COUNT || imageCount > MAX_MANUS_IMAGE_COUNT) {
+    throw new Error(
+      `A Manus retornou ${imageCount} imagens. O padrao exigido para geracao automatica e de ${MIN_MANUS_IMAGE_COUNT} a ${MAX_MANUS_IMAGE_COUNT} imagens.`,
+    );
+  }
+
+  if (manusResult.assets.audio.length !== 1) {
+    throw new Error(
+      `A Manus retornou ${manusResult.assets.audio.length} arquivos de audio. O fluxo automatico exige exatamente 1 narracao final.`,
+    );
+  }
+
+  const primaryAudio = manusResult.assets.audio[0]!;
+  const { probeAudioDurationFromBuffer } = await import(
+    "@/features/content/services/manus-audio-probe"
+  );
+  const audioDurationSeconds = await probeAudioDurationFromBuffer(
+    primaryAudio.buffer,
+    primaryAudio.fileName,
+  );
+
+  if (audioDurationSeconds > MAX_MANUS_AUDIO_SECONDS) {
+    throw new Error(
+      `A Manus retornou audio com ${Math.round(audioDurationSeconds)}s. O limite automatico para este projeto e ${MAX_MANUS_AUDIO_SECONDS}s.`,
+    );
+  }
 }
 
 export type OrchestratorResult = {
@@ -56,6 +93,8 @@ async function importCompletedManusResult({
     throw new Error(manusResult.warnings[0] || "A Manus nao concluiu a geracao automatica.");
   }
 
+  await validateManusAssetPackage(manusResult);
+
   const savedPaths: string[] = [];
   const mediaRows: Record<string, unknown>[] = [];
 
@@ -75,18 +114,17 @@ async function importCompletedManusResult({
       });
     }
 
-    for (const audio of manusResult.assets.audio) {
-      const file = await saveGeneratedAsset(audio.buffer, projectId, audio.fileName, audio.mimeType);
-      savedPaths.push(file.path);
-      mediaRows.push({
-        type: "AUDIO" as const,
-        path: file.path,
-        originalName: file.fileName,
-        size: file.size,
-        format: toFormat(file.fileName, audio.mimeType),
-        mimeType: audio.mimeType,
-      });
-    }
+    const audio = manusResult.assets.audio[0]!;
+    const file = await saveGeneratedAsset(audio.buffer, projectId, audio.fileName, audio.mimeType);
+    savedPaths.push(file.path);
+    mediaRows.push({
+      type: "AUDIO" as const,
+      path: file.path,
+      originalName: file.fileName,
+      size: file.size,
+      format: toFormat(file.fileName, audio.mimeType),
+      mimeType: audio.mimeType,
+    });
 
     await prisma.$transaction(async (tx) => {
       await tx.contentProject.update({
@@ -165,7 +203,9 @@ export async function runAssetPipelineForProject({
 
 Regras obrigatorias:
 - Retorne um JSON dentro de \`\`\`json ... \`\`\` com a seguinte estrutura: {"title": "...", "script": "...", "caption": "...", "hashtags": ["..."], "sceneIdeas": ["..."], "imagePrompts": ["..."]}
-- Forneca TODAS as imagens necessarias (minimo 3, proporcao 9:16) como anexos reais na resposta.
+- O tempo final do video deve seguir o que o usuario pediu no prompt, com limite maximo de ${MAX_MANUS_AUDIO_SECONDS} segundos.
+- Planeje a historia para renderizar com padrao de ${MIN_MANUS_IMAGE_COUNT} a ${MAX_MANUS_IMAGE_COUNT} imagens, sempre em proporcao 9:16.
+- Forneca TODAS as imagens necessarias (${MIN_MANUS_IMAGE_COUNT} a ${MAX_MANUS_IMAGE_COUNT}) como anexos reais na resposta.
 - Forneca tambem UM arquivo de audio de narracao completo como anexo real.
 - Nao responda so com texto: a tarefa so termina corretamente quando vierem JSON + imagens + audio.`;
       
@@ -197,12 +237,21 @@ Regras obrigatorias:
     }
 
     if (manusResult.taskStatus !== "stopped") {
+      if (
+        manusResult.status === "FAILED" ||
+        manusResult.status === "MANUAL_ACTION_REQUIRED"
+      ) {
+        throw new Error(
+          manusResult.warnings[0] || "A Manus nao concluiu a geracao automatica.",
+        );
+      }
+
       return {
         providerUsed: "MANUS",
         plan: manusResult.plan ?? null,
         images: [],
         audio: null,
-        status: "RUNNING",
+        status: manusResult.status,
         missingAssets: { images: true, audio: true },
         warnings: manusResult.warnings,
         runId: run.id,
@@ -246,16 +295,76 @@ export async function syncPendingManusRunForProject(projectId: string) {
     throw new Error("Nao existe uma geracao Manus pendente para sincronizar.");
   }
 
+  if (latestRun.status === "COMPLETED" || latestRun.status === "PARTIAL") {
+    return { completed: true };
+  }
+
+  if (latestRun.status === "FAILED" || latestRun.status === "MANUAL_ACTION_REQUIRED") {
+    const summary =
+      typeof latestRun.summary === "string" && latestRun.summary.trim()
+        ? latestRun.summary.trim()
+        : "A Manus nao concluiu a geracao automatica.";
+    throw new Error(summary);
+  }
+
   const manusResult = await manusService.getNormalizedTaskResult(latestRun.providerTaskId);
 
   if (manusResult.taskStatus !== "stopped") {
+    if (
+      manusResult.status === "FAILED" ||
+      manusResult.status === "MANUAL_ACTION_REQUIRED"
+    ) {
+      await failAssetGenerationRun({
+        runId: latestRun.id,
+        summary: manusResult.rawText || manusResult.warnings[0] || "A Manus nao concluiu a geracao automatica.",
+        missingAssets: manusResult.missingAssets,
+      });
+
+      throw new Error(manusResult.warnings[0] || "A Manus nao concluiu a geracao automatica.");
+    }
+
     await updateAssetGenerationRun({
       runId: latestRun.id,
       status: "RUNNING",
+      missingAssets: manusResult.missingAssets,
       summary: manusResult.rawText,
     });
 
     return { completed: false };
+  }
+
+  const finalizationClaim = await prisma.assetGenerationRun.updateMany({
+    where: {
+      id: latestRun.id,
+      provider: "MANUS",
+      status: {
+        in: ["RUNNING", "QUEUED"],
+      },
+      finishedAt: null,
+    },
+    data: {
+      finishedAt: new Date(),
+    },
+  });
+
+  if (finalizationClaim.count === 0) {
+    const currentRun = await prisma.assetGenerationRun.findUnique({
+      where: { id: latestRun.id },
+      select: {
+        status: true,
+        summary: true,
+      },
+    });
+
+    if (currentRun?.status === "FAILED" || currentRun?.status === "MANUAL_ACTION_REQUIRED") {
+      const summary =
+        typeof currentRun.summary === "string" && currentRun.summary.trim()
+          ? currentRun.summary.trim()
+          : "A Manus nao concluiu a geracao automatica.";
+      throw new Error(summary);
+    }
+
+    return { completed: currentRun?.status === "COMPLETED" || currentRun?.status === "PARTIAL" };
   }
 
   return {

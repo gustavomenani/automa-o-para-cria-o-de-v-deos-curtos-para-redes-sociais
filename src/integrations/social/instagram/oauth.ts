@@ -13,13 +13,19 @@ function getRequiredEnv(name: string) {
   return value;
 }
 
+function getInstagramClientCredentials() {
+  return {
+    clientId: getRequiredEnv("INSTAGRAM_APP_ID"),
+    clientSecret: getRequiredEnv("INSTAGRAM_APP_SECRET"),
+  };
+}
+
 export function getInstagramScopes() {
   return [...INSTAGRAM_SCOPES];
 }
 
 export function getInstagramOAuthConfig(origin?: string) {
-  const clientId = getRequiredEnv("INSTAGRAM_APP_ID");
-  const clientSecret = getRequiredEnv("INSTAGRAM_APP_SECRET");
+  const { clientId, clientSecret } = getInstagramClientCredentials();
   const redirectUri =
     process.env.INSTAGRAM_OAUTH_CALLBACK_URL?.trim() ||
     `${origin ?? getRequiredEnv("APP_BASE_URL")}/api/oauth/instagram/callback`;
@@ -107,7 +113,7 @@ export async function exchangeInstagramCodeForTokens(input: {
 }
 
 async function exchangeInstagramAccessTokenForLongLivedToken(accessToken: string) {
-  const { clientSecret } = getInstagramOAuthConfig();
+  const { clientSecret } = getInstagramClientCredentials();
   const params = new URLSearchParams({
     grant_type: "ig_exchange_token",
     client_secret: clientSecret,
