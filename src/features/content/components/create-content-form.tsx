@@ -8,12 +8,11 @@ export function CreateContentForm() {
         <section className="space-y-5 rounded-lg border border-stone-200 bg-white p-5">
           <div className="rounded-md border border-teal-100 bg-teal-50 p-4">
             <p className="text-sm font-semibold text-teal-950">
-              Fluxo automatico com Manus primeiro
+              Fluxo automatico Manus-only
             </p>
             <p className="mt-2 text-sm leading-6 text-teal-900/80">
-              Preencha o prompt e gere assets com Manus. Se a Manus nao estiver configurada
-              ou retornar resultado parcial, o sistema tenta Gemini como fallback e mantem o
-              upload manual disponivel.
+              Preencha o prompt e gere assets com Manus. A geracao automatica espera roteiro,
+              imagens e audio vindos da Manus; sem fallback para outro provedor.
             </p>
             <p className="mt-2 text-sm leading-6 text-teal-900/80">
               As chaves ficam somente no servidor, configuradas via .env ou /settings.
@@ -98,8 +97,8 @@ export function CreateContentForm() {
               className="mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-2 file:text-sm file:font-medium"
             />
             <p className="mt-2 text-xs text-zinc-500">
-              Opcional no fluxo de IA. Envie aqui se o provedor retornar plano textual sem
-              imagens suficientes.
+              Opcional. Use upload manual se preferir complementar ou substituir os assets
+              gerados pela Manus.
             </p>
           </div>
 
@@ -115,7 +114,7 @@ export function CreateContentForm() {
               className="mt-2 block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-stone-100 file:px-3 file:py-2 file:text-sm file:font-medium"
             />
             <p className="mt-2 text-xs text-zinc-500">
-              Opcional no fluxo de IA. MP3, WAV ou M4A para completar resultados sem audio.
+              Opcional. MP3, WAV ou M4A para complementar ou substituir o audio gerado.
             </p>
           </div>
         </section>
@@ -124,7 +123,7 @@ export function CreateContentForm() {
       <div className="flex flex-col justify-end gap-3 sm:flex-row">
         <SubmitButton
           name="intent"
-          value="gemini"
+          value="manus"
           pendingLabel="Gerando com IA..."
           icon="wand"
         >

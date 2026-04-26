@@ -20,7 +20,7 @@ export default async function NewContentPage({
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Criar video curto</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-            Digite um prompt para a Gemini gerar roteiro, legenda, imagens, audio e o MP4, ou use uploads manuais se preferir.
+            Digite um prompt para a Manus gerar roteiro, legenda, imagens e audio, ou use uploads manuais se preferir.
           </p>
         </div>
         {feedback.error ? (

@@ -59,3 +59,31 @@ export async function saveManusSettingsAction(formData: FormData) {
   revalidatePath("/settings");
   redirect("/settings?saved=1");
 }
+
+export async function disconnectSocialAccountAction(formData: FormData) {
+  const user = await requireUser();
+  const socialAccountId = String(formData.get("socialAccountId") ?? "").trim();
+
+  if (!socialAccountId) {
+    redirect("/settings?socialError=Conta%20social%20invalida.");
+  }
+
+  await prisma.socialAccount.updateMany({
+    where: {
+      id: socialAccountId,
+      userId: user.id,
+    },
+    data: {
+      isActive: false,
+      reauthRequired: true,
+      status: "disconnected",
+      tokenErrorMessage: "Conta desconectada pelo usuario.",
+      accessTokenCiphertext: null,
+      refreshTokenCiphertext: null,
+      tokenExpiresAt: null,
+    },
+  });
+
+  revalidatePath("/settings");
+  redirect("/settings?socialDisconnected=1");
+}

@@ -15,11 +15,15 @@ import { SubmitButton } from "@/components/submit-button";
 import { CaptionReviewForm } from "@/features/content/components/caption-review-form";
 import { DeleteContentButton } from "@/features/content/components/delete-content-button";
 import { GenerateVideoButton } from "@/features/content/components/generate-video-button";
-import { generateContentVideoAction } from "@/features/content/actions";
+import { ManusSyncMonitor } from "@/features/content/components/manus-sync-monitor";
+import {
+  generateContentVideoAction,
+  publishSocialNowAction,
+  syncManusAssetsAction,
+} from "@/features/content/actions";
 import { requireUser } from "@/features/auth/session";
 import {
   formatAssetRunStatus,
-  formatProviderName,
   getDisplaySafeMessage,
   getMissingAssets,
   getRunSummaryMessage,
@@ -27,8 +31,9 @@ import {
 } from "@/features/content/asset-run-display";
 import { getContentById } from "@/features/content/queries";
 import { schedulePostAction } from "@/features/schedule/actions";
+import { getConnectedSocialAccounts } from "@/features/settings/queries";
 import { CAPTION_SYNC_WARNING } from "@/features/video/services/caption-helpers";
-import { readStoredGeminiPlan } from "@/integrations/gemini/gemini-service";
+import { readStoredManusPlan } from "@/integrations/manus/manus-service";
 import { formatContentType, formatFileSize } from "@/lib/formatters";
 import { toPublicFileUrl } from "@/lib/paths";
 
@@ -62,8 +67,11 @@ export default async function ContentDetailsPage({
   searchParams: Promise<{
     created?: string;
     generated?: string;
-    gemini?: string;
-    geminiError?: string;
+    manus?: string;
+    manusPending?: string;
+    manusError?: string;
+    publishedPlatform?: string;
+    publishError?: string;
     error?: string;
     captionSaved?: string;
     scheduleError?: string;
@@ -74,6 +82,7 @@ export default async function ContentDetailsPage({
   const feedback = await searchParams;
   const user = await requireUser();
   const content = await getContentById(id, user.id);
+  const socialAccounts = await getConnectedSocialAccounts();
 
   if (!content) {
     notFound();
@@ -86,7 +95,7 @@ export default async function ContentDetailsPage({
   const videoUrl = videoPath ? toPublicFileUrl(videoPath) : null;
   const isGenerationLocked = content.status === "PROCESSING";
   const today = getLocalDateInputValue(new Date());
-  const geminiPlan = await readStoredGeminiPlan(content.id);
+  const manusPlan = await readStoredManusPlan(content.id);
   const latestRun = content.assetGenerationRuns.at(0);
   const missingAssets = getMissingAssets(latestRun?.missingAssets);
   const isMissingMedia = missingAssets.images || missingAssets.audio;
@@ -109,9 +118,28 @@ export default async function ContentDetailsPage({
     Boolean(content.caption) &&
     (content.errorMessage === CAPTION_SYNC_WARNING ||
       content.errorMessage?.toLowerCase().includes("legenda"));
+  const shouldAutoSyncManus = latestRun?.provider === "MANUS" && latestRun.status === "RUNNING";
+  const instagramAccounts = socialAccounts.filter(
+    (account) => account.platform === "INSTAGRAM" && account.isActive && !account.reauthRequired,
+  );
+  const tiktokAccounts = socialAccounts.filter(
+    (account) => account.platform === "TIKTOK" && account.isActive && !account.reauthRequired,
+  );
+  const youtubeAccounts = socialAccounts.filter(
+    (account) => account.platform === "YOUTUBE" && account.isActive && !account.reauthRequired,
+  );
+  const publishedPlatformLabel =
+    feedback.publishedPlatform === "INSTAGRAM"
+      ? "Instagram"
+      : feedback.publishedPlatform === "TIKTOK"
+        ? "TikTok"
+        : feedback.publishedPlatform === "YOUTUBE"
+          ? "YouTube"
+          : null;
 
   return (
     <AppShell>
+      <ManusSyncMonitor contentId={content.id} active={shouldAutoSyncManus} />
       <div className="space-y-6">
         <Link
           href="/contents"
@@ -137,21 +165,48 @@ export default async function ContentDetailsPage({
           />
         ) : null}
 
-        {feedback.gemini ? (
+        {feedback.manus ? (
           <FeedbackBanner
             type="success"
             title="Assets processados por IA"
-            message="O fluxo Manus-first salvou o plano retornado. Quando Manus nao entrega todos os arquivos, Gemini pode complementar e o upload manual continua disponivel."
+            message="A Manus gerou e salvou o plano, as imagens e o audio retornados para este projeto."
           />
         ) : null}
 
-        {feedback.geminiError ? (
+        {feedback.manusPending ? (
+          <FeedbackBanner
+            type="info"
+            title="Manus ainda esta processando"
+            message="A task ainda nao terminou na Manus. Aguarde mais um pouco e clique em sincronizar novamente."
+          />
+        ) : null}
+
+        {feedback.manusError ? (
           <FeedbackBanner
             type="error"
             title="Nao foi possivel gerar assets automaticamente"
             message={decodeFeedbackMessage(
-              feedback.geminiError,
-              "Nao foi possivel gerar assets automaticamente. Revise configuracao da chave/provedor e complete com upload manual.",
+              feedback.manusError,
+              "Nao foi possivel gerar assets automaticamente. Revise a configuracao da Manus e complete com upload manual.",
+            )}
+          />
+        ) : null}
+
+        {publishedPlatformLabel ? (
+          <FeedbackBanner
+            type="success"
+            title={`Publicado no ${publishedPlatformLabel}`}
+            message={`O video foi enviado para a conta conectada do ${publishedPlatformLabel}.`}
+          />
+        ) : null}
+
+        {feedback.publishError ? (
+          <FeedbackBanner
+            type="error"
+            title="Falha ao publicar"
+            message={decodeFeedbackMessage(
+              feedback.publishError,
+              "Nao foi possivel publicar na rede selecionada agora.",
             )}
           />
         ) : null}
@@ -237,7 +292,7 @@ export default async function ContentDetailsPage({
                   Geracao de assets
                 </p>
                 <h2 className="mt-2 text-xl font-semibold">
-                  {formatProviderName(latestRun.provider)}
+                  {latestRun.provider === "MANUS" ? "Manus" : latestRun.provider}
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-zinc-600">
                   Status da ultima tentativa automatica. Se faltarem midias, complete com upload
@@ -252,7 +307,9 @@ export default async function ContentDetailsPage({
             <dl className="mt-5 grid gap-3 border-t border-stone-200 pt-5 text-sm sm:grid-cols-4">
               <div>
                 <dt className="text-zinc-500">Provedor</dt>
-                <dd className="mt-1 font-medium">{formatProviderName(latestRun.provider)}</dd>
+                <dd className="mt-1 font-medium">
+                  {latestRun.provider === "MANUS" ? "Manus" : latestRun.provider}
+                </dd>
               </div>
               <div>
                 <dt className="text-zinc-500">Task ID</dt>
@@ -274,6 +331,14 @@ export default async function ContentDetailsPage({
               <p className="mt-4 rounded-md bg-stone-50 p-4 text-sm leading-6 text-zinc-600">
                 {runSummaryMessage}
               </p>
+            ) : null}
+
+            {latestRun.status === "RUNNING" && latestRun.provider === "MANUS" ? (
+              <form action={syncManusAssetsAction.bind(null, content.id)} className="mt-4">
+                <SubmitButton pendingLabel="Sincronizando assets..." icon="wand">
+                  Sincronizar assets da Manus
+                </SubmitButton>
+              </form>
             ) : null}
           </section>
         ) : null}
@@ -384,12 +449,14 @@ export default async function ContentDetailsPage({
               </dl>
             ) : null}
 
-            {geminiPlan ? (
+            {manusPlan ? (
               <div className="mt-5 space-y-4 border-t border-stone-200 pt-5">
                 <div>
-                  <h2 className="text-sm font-semibold">Resultados Gemini</h2>
+                  <h2 className="text-sm font-semibold">Resultados Manus</h2>
                   <p className="mt-2 text-sm leading-6 text-zinc-600">
-                    {geminiPlan.reelsScript}
+                    {typeof manusPlan.script === "string"
+                      ? manusPlan.script
+                      : "Sem roteiro estruturado salvo."}
                   </p>
                 </div>
 
@@ -397,13 +464,15 @@ export default async function ContentDetailsPage({
                   <div className="rounded-md bg-stone-50 p-4">
                     <h3 className="text-sm font-semibold">Caption da postagem</h3>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-600">
-                      {geminiPlan.postCaption}
+                      {typeof manusPlan.caption === "string"
+                        ? manusPlan.caption
+                        : "Sem caption estruturada salva."}
                     </p>
                   </div>
                   <div className="rounded-md bg-stone-50 p-4">
                     <h3 className="text-sm font-semibold">Hashtags</h3>
                     <p className="mt-2 text-sm leading-6 text-zinc-600">
-                      {geminiPlan.hashtags.join(" ")}
+                      {Array.isArray(manusPlan.hashtags) ? manusPlan.hashtags.join(" ") : ""}
                     </p>
                   </div>
                 </div>
@@ -412,7 +481,7 @@ export default async function ContentDetailsPage({
                   <div>
                     <h3 className="text-sm font-semibold">Ideias de cenas</h3>
                     <ul className="mt-2 space-y-2 text-sm leading-6 text-zinc-600">
-                      {geminiPlan.sceneIdeas.map((idea) => (
+                      {(Array.isArray(manusPlan.sceneIdeas) ? manusPlan.sceneIdeas : []).map((idea) => (
                         <li key={idea}>{idea}</li>
                       ))}
                     </ul>
@@ -420,7 +489,7 @@ export default async function ContentDetailsPage({
                   <div>
                     <h3 className="text-sm font-semibold">Prompts de imagem</h3>
                     <ul className="mt-2 space-y-2 text-sm leading-6 text-zinc-600">
-                      {geminiPlan.imagePrompts.map((prompt) => (
+                      {(Array.isArray(manusPlan.imagePrompts) ? manusPlan.imagePrompts : []).map((prompt) => (
                         <li key={prompt}>{prompt}</li>
                       ))}
                     </ul>
@@ -431,13 +500,235 @@ export default async function ContentDetailsPage({
           </section>
 
           <aside className="space-y-5">
+            <section className="rounded-lg border border-stone-200 bg-white p-5">
+              <h2 className="font-semibold">Publicacao imediata</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-600">
+                Fluxo audit-ready com OAuth oficial para Instagram, TikTok e YouTube.
+              </p>
+              <form
+                action={publishSocialNowAction.bind(null, content.id, "INSTAGRAM")}
+                className="mt-4 space-y-4 rounded-lg border border-stone-200 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-medium">Instagram Reels</h3>
+                  <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                    publicacao direta
+                  </span>
+                </div>
+                <div>
+                  <label
+                    htmlFor="instagram-social-account"
+                    className="text-sm font-medium text-zinc-800"
+                  >
+                    Conta conectada
+                  </label>
+                  <select
+                    id="instagram-social-account"
+                    name="socialAccountId"
+                    disabled={!videoUrl || instagramAccounts.length === 0}
+                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                  >
+                    <option value="">Selecione</option>
+                    {instagramAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.accountName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="instagram-caption" className="text-sm font-medium text-zinc-800">
+                    Legenda
+                  </label>
+                  <textarea
+                    id="instagram-caption"
+                    name="caption"
+                    rows={4}
+                    required
+                    disabled={!videoUrl || instagramAccounts.length === 0}
+                    defaultValue={content.caption || ""}
+                    className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6 disabled:bg-stone-100 disabled:text-zinc-400"
+                  />
+                </div>
+
+                <SubmitButton
+                  disabled={!videoUrl || instagramAccounts.length === 0}
+                  fullWidth
+                  icon="wand"
+                  pendingLabel="Publicando no Instagram..."
+                >
+                  Publicar no Instagram agora
+                </SubmitButton>
+                <p className="text-xs leading-5 text-zinc-500">
+                  Instagram exige `PUBLIC_MEDIA_BASE_URL` publico para a API buscar o video.
+                </p>
+              </form>
+
+              <form
+                action={publishSocialNowAction.bind(null, content.id, "TIKTOK")}
+                className="mt-4 space-y-4 rounded-lg border border-stone-200 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-medium">TikTok</h3>
+                  <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                    upload direto
+                  </span>
+                </div>
+                <div>
+                  <label htmlFor="tiktok-social-account" className="text-sm font-medium text-zinc-800">
+                    Conta conectada
+                  </label>
+                  <select
+                    id="tiktok-social-account"
+                    name="socialAccountId"
+                    disabled={!videoUrl || tiktokAccounts.length === 0}
+                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                  >
+                    <option value="">Selecione</option>
+                    {tiktokAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.accountName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="tiktok-visibility" className="text-sm font-medium text-zinc-800">
+                    Privacidade
+                  </label>
+                  <select
+                    id="tiktok-visibility"
+                    name="visibility"
+                    disabled={!videoUrl || tiktokAccounts.length === 0}
+                    defaultValue="SELF_ONLY"
+                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                  >
+                    <option value="SELF_ONLY">Somente eu</option>
+                    <option value="MUTUAL_FOLLOW_FRIENDS">Amigos mutuos</option>
+                    <option value="FOLLOWER_OF_CREATOR">Seguidores</option>
+                    <option value="PUBLIC_TO_EVERYONE">Publico</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="tiktok-caption" className="text-sm font-medium text-zinc-800">
+                    Legenda
+                  </label>
+                  <textarea
+                    id="tiktok-caption"
+                    name="caption"
+                    rows={4}
+                    required
+                    disabled={!videoUrl || tiktokAccounts.length === 0}
+                    defaultValue={content.caption || ""}
+                    className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6 disabled:bg-stone-100 disabled:text-zinc-400"
+                  />
+                </div>
+
+                <SubmitButton
+                  disabled={!videoUrl || tiktokAccounts.length === 0}
+                  fullWidth
+                  icon="wand"
+                  pendingLabel="Publicando no TikTok..."
+                >
+                  Publicar no TikTok agora
+                </SubmitButton>
+              </form>
+
+              <form
+                action={publishSocialNowAction.bind(null, content.id, "YOUTUBE")}
+                className="mt-4 space-y-4 rounded-lg border border-stone-200 p-4"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-medium">YouTube Shorts</h3>
+                  <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                    upload auditavel
+                  </span>
+                </div>
+                <div>
+                  <label htmlFor="youtube-social-account" className="text-sm font-medium text-zinc-800">
+                    Conta conectada
+                  </label>
+                  <select
+                    id="youtube-social-account"
+                    name="socialAccountId"
+                    disabled={!videoUrl || youtubeAccounts.length === 0}
+                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                  >
+                    <option value="">Selecione</option>
+                    {youtubeAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.accountName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="youtube-visibility" className="text-sm font-medium text-zinc-800">
+                    Visibilidade
+                  </label>
+                  <select
+                    id="youtube-visibility"
+                    name="visibility"
+                    disabled={!videoUrl || youtubeAccounts.length === 0}
+                    defaultValue="private"
+                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                  >
+                    <option value="private">Privado</option>
+                    <option value="unlisted">Nao listado</option>
+                    <option value="public">Publico</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="youtube-caption" className="text-sm font-medium text-zinc-800">
+                    Descricao
+                  </label>
+                  <textarea
+                    id="youtube-caption"
+                    name="caption"
+                    rows={4}
+                    required
+                    disabled={!videoUrl || youtubeAccounts.length === 0}
+                    defaultValue={content.caption || ""}
+                    className="mt-2 w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm leading-6 disabled:bg-stone-100 disabled:text-zinc-400"
+                  />
+                </div>
+
+                <SubmitButton
+                  disabled={!videoUrl || youtubeAccounts.length === 0}
+                  fullWidth
+                  icon="wand"
+                  pendingLabel="Publicando no YouTube..."
+                >
+                  Publicar no YouTube agora
+                </SubmitButton>
+              </form>
+              {!videoUrl ? (
+                <p className="mt-3 text-xs leading-5 text-zinc-500">
+                  Gere o video antes de publicar.
+                </p>
+              ) : null}
+              {instagramAccounts.length === 0 ||
+              tiktokAccounts.length === 0 ||
+              youtubeAccounts.length === 0 ? (
+                <p className="mt-3 text-xs leading-5 text-zinc-500">
+                  Conecte as contas desejadas em /settings para habilitar a publicacao por rede.
+                </p>
+              ) : null}
+            </section>
+
             <section
               id="schedule-post"
               className="rounded-lg border border-stone-200 bg-white p-5"
             >
               <h2 className="font-semibold">Agendar postagem</h2>
               <p className="mt-2 text-sm leading-6 text-zinc-600">
-                Salve plataforma, data, horario e caption. Nenhuma rede social sera acionada ainda.
+                Salve plataforma, conta, data, horario e caption. A publicacao sera tentada quando
+                o agendamento for processado.
               </p>
               <form action={schedulePostAction} className="mt-4 space-y-4">
                 <input type="hidden" name="projectId" value={content.id} />
@@ -487,6 +778,46 @@ export default async function ContentDetailsPage({
                       className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label htmlFor="social-account" className="text-sm font-medium text-zinc-800">
+                    Conta conectada
+                  </label>
+                  <select
+                    id="social-account"
+                    name="socialAccountId"
+                    disabled={!videoUrl}
+                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                  >
+                    <option value="">Escolher depois</option>
+                    {socialAccounts.filter((account) => account.isActive).map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.platformLabel} · {account.accountName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="schedule-visibility" className="text-sm font-medium text-zinc-800">
+                    Visibilidade / privacidade
+                  </label>
+                  <select
+                    id="schedule-visibility"
+                    name="visibility"
+                    disabled={!videoUrl}
+                    defaultValue="private"
+                    className="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2.5 text-sm disabled:bg-stone-100 disabled:text-zinc-400"
+                  >
+                    <option value="private">Privado</option>
+                    <option value="unlisted">Nao listado</option>
+                    <option value="public">Publico</option>
+                    <option value="SELF_ONLY">TikTok · somente eu</option>
+                    <option value="MUTUAL_FOLLOW_FRIENDS">TikTok · amigos mutuos</option>
+                    <option value="FOLLOWER_OF_CREATOR">TikTok · seguidores</option>
+                    <option value="PUBLIC_TO_EVERYONE">TikTok · publico</option>
+                  </select>
                 </div>
 
                 <div>

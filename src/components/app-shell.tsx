@@ -46,7 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="absolute bottom-6 left-5 right-5 border-t border-stone-200 pt-5 text-xs leading-5 text-zinc-500">
-          MVP local com FFmpeg, Prisma e storage em disco. Manus e redes sociais ficam isolados em stubs.
+          MVP local com FFmpeg, Prisma e storage em disco. Manus alimenta a geracao automatica e a publicacao externa segue desativada.
         </div>
       </aside>
 

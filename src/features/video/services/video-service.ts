@@ -309,15 +309,15 @@ export class VideoService {
   }
 
   private async getProjectCaptionText(projectId: string) {
-    const planPath = path.join(process.cwd(), "storage", "uploads", projectId, "gemini-plan.json");
+    const planPath = path.join(process.cwd(), "storage", "uploads", projectId, "manus-plan.json");
 
     try {
       const plan = JSON.parse(await fs.readFile(planPath, "utf8")) as {
-        reelsScript?: unknown;
+        script?: unknown;
       };
 
-      return typeof plan.reelsScript === "string" && plan.reelsScript.trim()
-        ? plan.reelsScript
+      return typeof plan.script === "string" && plan.script.trim()
+        ? plan.script
         : null;
     } catch {
       return null;

@@ -80,6 +80,23 @@ enum AssetGenerationStatus {
   @@map("asset_generation_status")
 }
 
+enum JobName {
+  AI_ASSET_GENERATION
+  VIDEO_RENDER
+  SCHEDULE_PUBLISH
+
+  @@map("job_name")
+}
+
+enum JobRunStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+
+  @@map("job_run_status")
+}
+
 model User {
   id             String           @id @default(cuid())
   name           String?
@@ -90,6 +107,7 @@ model User {
   projects       ContentProject[]
   manusSettings  ManusSettings?
   socialAccounts SocialAccount[]
+  jobRuns        JobRun[]
 
   @@map("users")
 }
@@ -110,6 +128,7 @@ model ContentProject {
   generatedVideos     GeneratedVideo[]
   scheduledPosts      ScheduledPost[]
   assetGenerationRuns AssetGenerationRun[]
+  jobRuns             JobRun[]
 
   @@index([userId])
   @@index([contentType])
@@ -154,15 +173,26 @@ model GeneratedVideo {
 model ScheduledPost {
   id          String              @id @default(cuid())
   projectId   String
+  socialAccountId String?
   platform    SocialPlatform
   scheduledAt DateTime
   caption     String
+  visibility  String?
+  providerPostId String?
+  providerStatus String?
+  publishErrorCode String?
+  publishErrorMessage String?
+  publishAttemptedAt DateTime?
+  publishedAt DateTime?
   status      ScheduledPostStatus @default(SCHEDULED)
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
   project     ContentProject      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount?    @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  jobRuns     JobRun[]
 
   @@index([projectId])
+  @@index([socialAccountId])
   @@index([platform])
   @@index([scheduledAt])
   @@index([status])
@@ -176,12 +206,24 @@ model SocialAccount {
   accountName    String
   externalId     String?
   accessTokenRef String?
+  providerAccountType String?
+  accessTokenCiphertext String?
+  refreshTokenCiphertext String?
+  tokenExpiresAt DateTime?
+  scopes       Json?
+  status       String         @default("active")
+  reauthRequired Boolean      @default(false)
+  tokenErrorMessage String?
+  lastValidatedAt DateTime?
+  providerMetadata Json?
   isActive       Boolean        @default(true)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scheduledPosts ScheduledPost[]
 
   @@unique([userId, platform, accountName])
+  @@index([externalId])
   @@index([userId])
   @@index([platform])
   @@map("social_accounts")
@@ -224,4 +266,50 @@ model AssetGenerationRun {
   @@index([createdAt])
   @@index([providerTaskId])
   @@map("asset_generation_runs")
+}
+
+model JobRun {
+  id              String        @id @default(cuid())
+  name            JobName
+  status          JobRunStatus  @default(QUEUED)
+  userId          String?
+  projectId       String?
+  scheduledPostId String?
+  bullJobId       String?
+  payload         Json
+  attemptsMade    Int           @default(0)
+  attemptsAllowed Int           @default(3)
+  errorCode       String?
+  errorMessage    String?
+  queuedAt        DateTime      @default(now())
+  startedAt       DateTime?
+  completedAt     DateTime?
+  failedAt        DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project         ContentProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  scheduledPost   ScheduledPost? @relation(fields: [scheduledPostId], references: [id], onDelete: SetNull)
+  logs            JobRunLog[]
+
+  @@index([userId, status])
+  @@index([projectId, status])
+  @@index([scheduledPostId, status])
+  @@index([bullJobId])
+  @@index([createdAt])
+  @@map("job_runs")
+}
+
+model JobRunLog {
+  id        String   @id @default(cuid())
+  jobRunId  String
+  level     String   @default("info")
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+  jobRun    JobRun   @relation(fields: [jobRunId], references: [id], onDelete: Cascade)
+
+  @@index([jobRunId])
+  @@index([createdAt])
+  @@map("job_run_logs")
 }

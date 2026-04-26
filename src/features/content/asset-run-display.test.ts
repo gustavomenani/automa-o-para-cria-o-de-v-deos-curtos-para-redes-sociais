@@ -36,6 +36,12 @@ describe("asset run display helpers", () => {
     expect(getDisplaySafeMessage("C:\\Users\\User\\.env MANUS_API_KEY=secret", fallback)).toBe(
       fallback,
     );
+    expect(
+      getDisplaySafeMessage(
+        "MANUS_API_KEY nao configurada. Cadastre a chave em /settings ou no arquivo .env.",
+        fallback,
+      ),
+    ).toBe("MANUS_API_KEY nao configurada. Cadastre a chave em /settings ou no arquivo .env.");
     expect(getDisplaySafeMessage('{"error":"raw provider payload"}', fallback)).toBe(fallback);
     expect(getDisplaySafeMessage("Plano textual gerado sem audio.", fallback)).toBe(
       "Plano textual gerado sem audio.",

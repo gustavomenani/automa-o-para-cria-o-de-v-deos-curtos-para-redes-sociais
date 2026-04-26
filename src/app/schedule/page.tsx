@@ -3,6 +3,8 @@ import { CalendarClock, ExternalLink, PlusCircle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { DeleteContentButton } from "@/features/content/components/delete-content-button";
+import { SubmitButton } from "@/components/submit-button";
+import { processDueScheduledPostsAction } from "@/features/schedule/actions";
 import { getScheduledPosts } from "@/features/schedule/queries";
 import { requireUser } from "@/features/auth/session";
 import { formatDateTime } from "@/lib/formatters";
@@ -35,7 +37,7 @@ const statusBadgeClasses = {
 export default async function SchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ deleted?: string; scheduled?: string }>;
+  searchParams: Promise<{ deleted?: string; scheduled?: string; processed?: string }>;
 }) {
   const feedback = await searchParams;
   const user = await requireUser();
@@ -51,23 +53,31 @@ export default async function SchedulePage({
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight">Postagens agendadas</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-              Controle dos posts planejados. O MVP apenas salva os agendamentos, sem publicar automaticamente.
+              Controle dos posts planejados. Instagram, TikTok e YouTube podem publicar por conta
+              conectada quando o agendamento vencer.
             </p>
           </div>
-          <Link
-            href="/contents"
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800"
-          >
-            <PlusCircle size={18} />
-            Escolher conteudo
-          </Link>
+          <div className="flex gap-2">
+            <form action={processDueScheduledPostsAction}>
+              <SubmitButton pendingLabel="Processando vencidos..." variant="secondary" icon="calendar">
+                Processar vencidos
+              </SubmitButton>
+            </form>
+            <Link
+              href="/contents"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-800"
+            >
+              <PlusCircle size={18} />
+              Escolher conteudo
+            </Link>
+          </div>
         </div>
 
         {feedback.scheduled ? (
           <FeedbackBanner
             type="success"
             title="Postagem agendada"
-            message="O agendamento foi salvo no banco. Nenhuma rede social foi acionada."
+            message="O agendamento foi salvo e ficara pronto para ser processado no horario definido."
           />
         ) : null}
 
@@ -76,6 +86,14 @@ export default async function SchedulePage({
             type="success"
             title="Conteudo excluido"
             message="O conteudo relacionado ao agendamento foi removido com seus arquivos e registros."
+          />
+        ) : null}
+
+        {feedback.processed ? (
+          <FeedbackBanner
+            type="success"
+            title="Agendamentos processados"
+            message="As postagens vencidas com conta conectada foram tentadas agora."
           />
         ) : null}
 
@@ -137,6 +155,15 @@ export default async function SchedulePage({
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-600">
                         {post.caption}
                       </p>
+                      {post.socialAccount ? (
+                        <p className="mt-2 text-xs text-zinc-500">
+                          Conta: {post.socialAccount.accountName}
+                          {post.providerStatus ? ` · provider: ${post.providerStatus}` : ""}
+                        </p>
+                      ) : null}
+                      {post.publishErrorMessage ? (
+                        <p className="mt-2 text-xs text-red-700">{post.publishErrorMessage}</p>
+                      ) : null}
                     </div>
 
                     <div className="flex gap-2 lg:justify-end">

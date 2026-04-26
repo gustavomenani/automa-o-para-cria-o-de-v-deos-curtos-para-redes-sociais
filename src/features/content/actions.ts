@@ -7,10 +7,14 @@ import {
   createProjectWithUploads,
   parseProjectFormData,
 } from "@/features/content/services/upload-service";
-import { runAssetPipelineForProject } from "@/features/content/services/ai-asset-orchestrator";
+import {
+  runAssetPipelineForProject,
+  syncPendingManusRunForProject,
+} from "@/features/content/services/ai-asset-orchestrator";
 import { requireUser } from "@/features/auth/session";
+import { publishProjectNow } from "@/integrations/social/publish-orchestrator";
+import { socialPlatformLabels } from "@/integrations/social/social-platforms";
 import { videoService } from "@/features/video/services/video-service";
-import { geminiService } from "@/integrations/gemini/gemini-service";
 import { prisma } from "@/lib/prisma";
 import { normalizeSafeError } from "@/lib/api-response";
 import { deleteProjectStorage } from "@/lib/storage/local-storage";
@@ -22,8 +26,7 @@ const FORBIDDEN_CONTENT_ERROR = "Voce nao tem acesso a este conteudo.";
 
 function isKnownFriendlyMessage(message: string) {
   return [
-    "GEMINI_API_KEY nao configurada. Adicione a chave no arquivo .env.",
-    "GEMINI_API_KEY não configurada. Adicione a chave no arquivo .env.",
+    "MANUS_API_KEY nao configurada. Cadastre a chave em /settings ou no arquivo .env.",
     "Projeto precisa de pelo menos uma imagem.",
     "Projeto precisa de um arquivo de audio.",
     "Projeto nao encontrado.",
@@ -85,7 +88,7 @@ export async function createContentAction(formData: FormData) {
   const { input, files } = parsedForm;
   const intent = formData.get("intent");
 
-  if (intent === "gemini") {
+  if (intent === "manus") {
     let content;
 
     try {
@@ -94,7 +97,7 @@ export async function createContentAction(formData: FormData) {
       redirectWithNewContentError(error);
     }
 
-    let targetUrl = `/contents/${content.id}?gemini=1`;
+    let targetUrl = `/contents/${content.id}?manus=1`;
 
     try {
       const result = await runAssetPipelineForProject({
@@ -103,7 +106,7 @@ export async function createContentAction(formData: FormData) {
       });
 
       const canGenerateVideo = result.images.length > 0 && Boolean(result.audio);
-      const params = new URLSearchParams({ gemini: "1" });
+      const params = new URLSearchParams({ manus: "1" });
 
       if (canGenerateVideo) {
         try {
@@ -118,7 +121,7 @@ export async function createContentAction(formData: FormData) {
       } else {
         params.set(
           "videoWarning",
-          `O provedor (${result.providerUsed}) retornou o plano textual, mas não gerou imagens e áudio suficientes para montar o MP4 automaticamente. Complete manualmente.`,
+          `A Manus retornou o plano textual, mas nao gerou imagens e audio suficientes para montar o MP4 automaticamente. Complete manualmente.`,
         );
       }
 
@@ -142,7 +145,7 @@ export async function createContentAction(formData: FormData) {
       });
 
       await revalidateContentPages(content.id);
-      targetUrl = `/contents/${content.id}?geminiError=${encodeURIComponent(
+      targetUrl = `/contents/${content.id}?manusError=${encodeURIComponent(
         friendlyErrorMessage(error, GENERIC_ASSET_ERROR),
       )}`;
     }
@@ -196,28 +199,87 @@ export async function generateContentVideoAction(contentId: string) {
   redirect(targetUrl);
 }
 
-export async function generateGeminiAssetsAction(contentId: string) {
+export async function syncManusAssetsAction(contentId: string) {
   const user = await requireUser();
+  let completed = false;
 
   try {
-    const project = await prisma.contentProject.findFirst({
-      where: { id: contentId, userId: user.id },
-      select: { prompt: true },
-    });
-
-    if (!project) {
-      throw new Error(FORBIDDEN_CONTENT_ERROR);
-    }
-
-    await geminiService.generateTestAssetsForProject(contentId, project.prompt);
+    await assertOwnedContent(contentId, user.id);
+    const synced = await syncPendingManusRunForProject(contentId);
+    completed = synced.completed;
 
     await revalidateContentPages(contentId);
   } catch (error) {
-    const message = friendlyErrorMessage(error, GENERIC_ASSET_ERROR);
-    redirect(`/contents/${contentId}?geminiError=${encodeURIComponent(message)}`);
+    await revalidateContentPages(contentId);
+    redirect(
+      `/contents/${contentId}?manusError=${encodeURIComponent(
+        friendlyErrorMessage(error, GENERIC_ASSET_ERROR),
+      )}`,
+    );
   }
 
-  redirect(`/contents/${contentId}?gemini=1`);
+  if (!completed) {
+    redirect(`/contents/${contentId}?manusPending=1`);
+  }
+
+  redirect(`/contents/${contentId}?manus=1`);
+}
+
+export async function publishSocialNowAction(
+  contentId: string,
+  platform: "INSTAGRAM" | "TIKTOK" | "YOUTUBE",
+  formData: FormData,
+) {
+  const user = await requireUser();
+  const providerLabel = socialPlatformLabels[platform];
+
+  try {
+    await assertOwnedContent(contentId, user.id);
+    const socialAccountId = String(formData.get("socialAccountId") ?? "").trim();
+    const caption = String(formData.get("caption") ?? "").trim();
+    const visibility = String(formData.get("visibility") ?? "private").trim();
+
+    if (!socialAccountId) {
+      throw new Error(`Selecione uma conta conectada do ${providerLabel}.`);
+    }
+
+    if (!caption) {
+      throw new Error("Informe a legenda antes de publicar.");
+    }
+
+    const socialAccount = await prisma.socialAccount.findFirst({
+      where: {
+        id: socialAccountId,
+        userId: user.id,
+        platform,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!socialAccount) {
+      throw new Error(`A conta selecionada nao pertence ao ${providerLabel}.`);
+    }
+
+    await publishProjectNow({
+      projectId: contentId,
+      socialAccountId,
+      caption,
+      visibility,
+    });
+
+    await revalidateContentPages(contentId);
+    redirect(`/contents/${contentId}?publishedPlatform=${platform}`);
+  } catch (error) {
+    await revalidateContentPages(contentId);
+    redirect(
+      `/contents/${contentId}?publishError=${encodeURIComponent(
+        friendlyErrorMessage(error, `Nao foi possivel publicar no ${providerLabel}.`),
+      )}`,
+    );
+  }
 }
 
 export async function saveCaptionReviewAction(contentId: string, formData: FormData) {

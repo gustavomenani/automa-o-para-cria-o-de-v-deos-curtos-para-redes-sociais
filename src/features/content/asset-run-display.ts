@@ -53,8 +53,7 @@ export function getDisplaySafeMessage(message: string, fallback: string) {
   }
 
   if (
-    trimmed.includes("GEMINI_API_KEY nao configurada. Adicione a chave no arquivo .env.") ||
-    trimmed.includes("GEMINI_API_KEY não configurada. Adicione a chave no arquivo .env.")
+    trimmed.includes("MANUS_API_KEY nao configurada. Cadastre a chave em /settings ou no arquivo .env.")
   ) {
     return trimmed;
   }

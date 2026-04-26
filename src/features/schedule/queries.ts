@@ -4,6 +4,7 @@ export async function getScheduledPosts(userId: string) {
   return prisma.scheduledPost.findMany({
     where: { project: { userId } },
     include: {
+      socialAccount: true,
       project: {
         include: {
           generatedVideos: {

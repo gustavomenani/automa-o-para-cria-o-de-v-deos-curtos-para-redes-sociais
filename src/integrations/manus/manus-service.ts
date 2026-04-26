@@ -1,4 +1,10 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { uploadRoot } from "@/lib/paths";
+
 export type ManusTaskStatus = "queued" | "running" | "completed" | "failed";
+
+export type NormalizedManusStatus = "QUEUED" | "RUNNING" | "COMPLETED" | "PARTIAL" | "FAILED" | "MANUAL_ACTION_REQUIRED";
 
 export type ManusTask = {
   id: string;
@@ -30,10 +36,52 @@ export type ManusGeneratedImageAsset = {
   url: string;
 };
 
+export type ManusGeneratedAudioAsset = {
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
+  url: string;
+};
+
+export type NormalizedManusResult = {
+  providerTaskId: string;
+  status: NormalizedManusStatus;
+  plan?: {
+    title?: string;
+    script?: string;
+    caption?: string;
+    hashtags?: string[];
+    sceneIdeas?: string[];
+    imagePrompts?: string[];
+    [key: string]: unknown;
+  };
+  missingAssets: {
+    images: boolean;
+    audio: boolean;
+  };
+  assets: {
+    images: ManusGeneratedImageAsset[];
+    audio: ManusGeneratedAudioAsset[];
+  };
+  warnings: string[];
+  rawText?: string;
+  taskStatus?: "running" | "stopped" | "waiting" | "error";
+};
+
 export type ManusServiceConfig = {
   apiKey?: string;
   modelPreference?: string;
   promptPreference?: string;
+};
+
+export type ManusStoredPlan = {
+  title?: string;
+  script?: string;
+  caption?: string;
+  hashtags?: string[];
+  sceneIdeas?: string[];
+  imagePrompts?: string[];
+  [key: string]: unknown;
 };
 
 type ManusAttachment = {
@@ -77,8 +125,46 @@ type ManusCreateTaskResponse = {
   task_url?: string;
 };
 
+type ManusTaskDetailResponse = {
+  ok?: boolean;
+  task?: {
+    id?: string;
+    status?: "running" | "stopped" | "waiting" | "error";
+    title?: string;
+  };
+};
+
 function createMockId(prefix: string) {
   return `${prefix}_${Date.now().toString(36)}`;
+}
+
+function isTaskNotFoundError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return error.message.includes("Falha na API da Manus (404)") && error.message.includes("Task not found");
+}
+
+export async function writeStoredManusPlan(projectId: string, plan: ManusStoredPlan) {
+  const folder = path.join(uploadRoot, projectId);
+  await fs.mkdir(folder, { recursive: true });
+  await fs.writeFile(path.join(folder, "manus-plan.json"), JSON.stringify(plan, null, 2), "utf8");
+}
+
+export async function readStoredManusPlan(projectId: string): Promise<ManusStoredPlan | null> {
+  try {
+    const content = await fs.readFile(path.join(uploadRoot, projectId, "manus-plan.json"), "utf8");
+    const parsed = JSON.parse(content);
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+
+    return parsed as ManusStoredPlan;
+  } catch {
+    return null;
+  }
 }
 
 export class ManusService {
@@ -86,6 +172,10 @@ export class ManusService {
 
   private get apiKey() {
     return this.config.apiKey || process.env.MANUS_API_KEY || "";
+  }
+
+  get hasApiKey() {
+    return !!this.apiKey;
   }
 
   private ensureApiKey() {
@@ -137,8 +227,12 @@ export class ManusService {
         }),
       });
 
+      if (!response.ok || !response.task_id) {
+        throw new Error("A Manus respondeu ao criar a task, mas nao retornou um task_id valido.");
+      }
+
       return {
-        id: response.task_id || createMockId("manus_task"),
+        id: response.task_id,
         prompt,
         status: "queued",
         createdAt: new Date().toISOString(),
@@ -153,16 +247,124 @@ export class ManusService {
     };
   }
 
+  async getNormalizedTaskResult(taskId: string): Promise<NormalizedManusResult> {
+    if (!this.apiKey) {
+      return {
+        providerTaskId: taskId,
+        status: "COMPLETED",
+        missingAssets: { images: true, audio: true },
+        assets: { images: [], audio: [] },
+        warnings: ["Mock mode: no API key"],
+      };
+    }
+
+    const response = await this.listRawTaskMessages(taskId);
+    const taskDetail = await this.getTaskDetail(taskId).catch(() => null);
+    const messages = response.messages || [];
+
+    const latestStatusUpdate = messages
+      .map((m) => m.status_update?.agent_status)
+      .find(Boolean);
+    const errorMsg = messages.map((m) => m.error_message?.content).find(Boolean);
+    const taskStatus = taskDetail?.task?.status;
+
+    let status: NormalizedManusStatus = "QUEUED";
+    if (
+      latestStatusUpdate === "running" ||
+      latestStatusUpdate === "waiting" ||
+      taskStatus === "running" ||
+      taskStatus === "waiting"
+    ) {
+      status = "RUNNING";
+    } else if (latestStatusUpdate === "stopped" || taskStatus === "stopped") {
+      status = "COMPLETED";
+    } else if (latestStatusUpdate === "error" || taskStatus === "error" || errorMsg) {
+      status = "FAILED";
+    }
+
+    const allText = messages
+      .map((m) =>
+        m.assistant_message?.content ||
+        (m as { explanation?: { content?: string } }).explanation?.content ||
+        m.status_update?.brief ||
+        m.error_message?.content ||
+        "",
+      )
+      .join(" ")
+      .toLowerCase();
+    
+    if (status === "FAILED" && (allText.includes("manual") || allText.includes("human") || allText.includes("interact"))) {
+      status = "MANUAL_ACTION_REQUIRED";
+    }
+
+    const assistantContent = messages
+      .map((m) =>
+        m.assistant_message?.content ||
+        (m as { explanation?: { content?: string } }).explanation?.content ||
+        "",
+      )
+      .filter(Boolean)
+      .join("\n");
+      
+    let plan = undefined;
+    const jsonMatch = assistantContent.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      try {
+        plan = JSON.parse(jsonMatch[1]);
+      } catch {
+      }
+    }
+
+    const attachments = this.getAssistantAttachments(response);
+    const imageAttachments = attachments.filter(a => a.type === "image" || a.content_type?.startsWith("image/"));
+    const audioAttachments = attachments.filter(a => a.type === "audio" || a.content_type?.startsWith("audio/"));
+
+    const missingAssets = {
+      images: imageAttachments.length === 0,
+      audio: audioAttachments.length === 0,
+    };
+
+    if (status === "COMPLETED" && (missingAssets.images || missingAssets.audio)) {
+      status = "PARTIAL";
+    }
+
+    const warnings: string[] = [];
+    if (errorMsg) warnings.push(errorMsg.substring(0, 200)); // Truncated to avoid huge leaks
+    if (status === "PARTIAL") warnings.push("A Manus não retornou todos os anexos esperados (imagens/áudio).");
+    if (attachments.length === 0 && status === "COMPLETED") warnings.push("A Manus não retornou anexos.");
+
+    const images = await Promise.all(
+      imageAttachments.map((att, i) => this.downloadImageAttachment(att, i)),
+    ).then((res) => res.filter((img): img is ManusGeneratedImageAsset => img !== null));
+    const audio = await Promise.all(
+      audioAttachments.map((att, i) => this.downloadAudioAttachment(att, i)),
+    ).then((res) => res.filter((asset): asset is ManusGeneratedAudioAsset => asset !== null));
+    
+    return {
+      providerTaskId: taskId,
+      status,
+      plan,
+      missingAssets,
+      assets: {
+        images,
+        audio,
+      },
+      warnings,
+      rawText: assistantContent,
+      taskStatus,
+    };
+  }
+
   async getTaskStatus(taskId: string): Promise<{ taskId: string; status: ManusTaskStatus }> {
     if (this.apiKey) {
-      const response = await this.listRawTaskMessages(taskId);
-      const latestStatus = response.messages
-        ?.map((message) => message.status_update?.agent_status)
-        .find(Boolean);
+      const taskDetail = await this.getTaskDetail(taskId).catch(() => null);
+      const latestStatus = taskDetail?.task?.status;
 
       if (latestStatus === "stopped") return { taskId, status: "completed" };
       if (latestStatus === "error") return { taskId, status: "failed" };
-      if (latestStatus === "running" || latestStatus === "waiting") return { taskId, status: "running" };
+      if (latestStatus === "running" || latestStatus === "waiting") {
+        return { taskId, status: "running" };
+      }
     }
 
     return {
@@ -301,9 +503,44 @@ ${imagePrompts.map((item, index) => `${index + 1}. ${item}`).join("\n")}`;
       verbose: "true",
     });
 
-    return this.request<ManusTaskMessageResponse>(`task.listMessages?${query.toString()}`, {
-      method: "GET",
-    });
+    try {
+      return await this.request<ManusTaskMessageResponse>(`task.listMessages?${query.toString()}`, {
+        method: "GET",
+      });
+    } catch (error) {
+      if (!isTaskNotFoundError(error)) {
+        throw error;
+      }
+
+      const detail = await this.getTaskDetail(taskId);
+
+      if (!detail.task?.id) {
+        throw error;
+      }
+
+      return {
+        ok: true,
+        task_id: taskId,
+        messages: [
+          {
+            type: "status_update",
+            status_update: {
+              agent_status: detail.task.status || "running",
+              brief: "Task criada; aguardando eventos da Manus ficarem disponiveis.",
+            },
+          },
+        ],
+      };
+    }
+  }
+
+  private async getTaskDetail(taskId: string) {
+    return this.request<ManusTaskDetailResponse>(
+      `task.detail?${new URLSearchParams({ task_id: taskId }).toString()}`,
+      {
+        method: "GET",
+      },
+    );
   }
 
   private getAssistantAttachments(response: ManusTaskMessageResponse) {
@@ -339,6 +576,45 @@ ${imagePrompts.map((item, index) => `${index + 1}. ${item}`).join("\n")}`;
     return {
       buffer,
       fileName: attachment.filename || `manus-scene-${index + 1}.${extension}`,
+      mimeType,
+      url: attachment.url,
+    };
+  }
+
+  private async downloadAudioAttachment(
+    attachment: ManusAttachment,
+    index: number,
+  ): Promise<ManusGeneratedAudioAsset | null> {
+    if (!attachment.url) {
+      return null;
+    }
+
+    const response = await fetch(attachment.url, {
+      headers: {
+        "x-manus-api-key": this.apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const mimeType =
+      attachment.content_type || response.headers.get("content-type") || "audio/mpeg";
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const extension = mimeType.includes("wav")
+      ? "wav"
+      : mimeType.includes("ogg")
+        ? "ogg"
+        : mimeType.includes("webm")
+          ? "webm"
+          : mimeType.includes("mp4") || mimeType.includes("m4a")
+            ? "m4a"
+            : "mp3";
+
+    return {
+      buffer,
+      fileName: attachment.filename || `manus-audio-${index + 1}.${extension}`,
       mimeType,
       url: attachment.url,
     };

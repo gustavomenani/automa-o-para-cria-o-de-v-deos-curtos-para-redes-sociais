@@ -2,8 +2,14 @@ import { Bot, KeyRound, Settings, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { FeedbackBanner } from "@/components/feedback-banner";
 import { SubmitButton } from "@/components/submit-button";
-import { saveManusSettingsAction } from "@/features/settings/actions";
-import { getManusSettings } from "@/features/settings/queries";
+import {
+  disconnectSocialAccountAction,
+  saveManusSettingsAction,
+} from "@/features/settings/actions";
+import {
+  getConnectedSocialAccounts,
+  getManusSettings,
+} from "@/features/settings/queries";
 import { requireUser } from "@/features/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -11,11 +17,19 @@ export const dynamic = "force-dynamic";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{
+    saved?: string;
+    instagramConnected?: string;
+    tiktokConnected?: string;
+    youtubeConnected?: string;
+    socialDisconnected?: string;
+    socialError?: string;
+  }>;
 }) {
   const feedback = await searchParams;
   await requireUser();
   const manusSettings = await getManusSettings();
+  const socialAccounts = await getConnectedSocialAccounts();
 
   return (
     <AppShell>
@@ -27,7 +41,7 @@ export default async function SettingsPage({
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Preferencias do sistema</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
             Configure credenciais server-side para Manus e padroes usados na geracao de assets.
-            Quando a chave nao estiver disponivel, o fluxo tenta fallback sem expor segredos.
+            A geracao automatica depende da Manus e mantem as credenciais isoladas no servidor.
           </p>
         </div>
 
@@ -36,6 +50,46 @@ export default async function SettingsPage({
             type="success"
             title="Configuracoes salvas"
             message="As preferencias foram atualizadas no banco local."
+          />
+        ) : null}
+
+        {feedback.youtubeConnected ? (
+          <FeedbackBanner
+            type="success"
+            title="Conta conectada"
+            message="A conta do YouTube foi conectada e esta pronta para uploads auditaveis."
+          />
+        ) : null}
+
+        {feedback.instagramConnected ? (
+          <FeedbackBanner
+            type="success"
+            title="Conta conectada"
+            message="A conta do Instagram foi conectada e esta pronta para publicar Reels."
+          />
+        ) : null}
+
+        {feedback.tiktokConnected ? (
+          <FeedbackBanner
+            type="success"
+            title="Conta conectada"
+            message="A conta do TikTok foi conectada e esta pronta para publicacao direta."
+          />
+        ) : null}
+
+        {feedback.socialDisconnected ? (
+          <FeedbackBanner
+            type="success"
+            title="Conta desconectada"
+            message="Os tokens foram removidos e a conta foi marcada para nova autenticacao."
+          />
+        ) : null}
+
+        {feedback.socialError ? (
+          <FeedbackBanner
+            type="error"
+            title="Falha ao conectar conta"
+            message={decodeURIComponent(feedback.socialError)}
           />
         ) : null}
 
@@ -48,8 +102,7 @@ export default async function SettingsPage({
               <div>
                 <h2 className="font-semibold">Manus</h2>
                 <p className="mt-1 text-sm leading-6 text-zinc-500">
-                  Integracao real quando configurada; sem chave ou acesso, o sistema registra
-                  fallback e mantem upload manual.
+                  Integracao principal para roteiro, imagens e audio no fluxo automatico.
                 </p>
               </div>
             </div>
@@ -77,11 +130,86 @@ export default async function SettingsPage({
               <div>
                 <h2 className="font-semibold">Redes sociais</h2>
                 <p className="mt-1 text-sm leading-6 text-zinc-500">
-                  Publicacao externa permanece desativada neste MVP.
+                  OAuth oficial, tokens cifrados e publicacao real para Instagram, TikTok e
+                  YouTube.
                 </p>
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="rounded-lg border border-stone-200 bg-white p-5">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+            <div>
+              <h2 className="font-semibold">Contas sociais conectadas</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
+                Base audit-ready com OAuth oficial, escopos minimos, tokens cifrados e trilha de
+                reconexao. Instagram, TikTok e YouTube usam a mesma infraestrutura.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/api/oauth/instagram/start"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-stone-100"
+              >
+                Conectar Instagram
+              </a>
+              <a
+                href="/api/oauth/tiktok/start"
+                className="inline-flex items-center justify-center gap-2 rounded-md border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-900 hover:bg-stone-100"
+              >
+                Conectar TikTok
+              </a>
+              <a
+                href="/api/oauth/youtube/start"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800"
+              >
+                Conectar YouTube
+              </a>
+            </div>
+          </div>
+
+          {socialAccounts.length === 0 ? (
+            <p className="mt-4 text-sm text-zinc-500">Nenhuma conta conectada ainda.</p>
+          ) : (
+            <div className="mt-5 space-y-4">
+              {socialAccounts.map((account) => (
+                <article
+                  key={account.id}
+                  className="flex flex-col justify-between gap-4 rounded-lg border border-stone-200 p-4 md:flex-row md:items-center"
+                >
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold">{account.accountName}</h3>
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                        {account.platformLabel}
+                      </span>
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+                        {account.status}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-zinc-600">
+                      {account.reauthRequired
+                        ? "Exige nova autenticacao."
+                        : account.tokenExpiresAt
+                          ? `Token expira em ${account.tokenExpiresAt.toLocaleString("pt-BR")}.`
+                          : "Token sem expiracao conhecida."}
+                    </p>
+                    {account.tokenErrorMessage ? (
+                      <p className="mt-1 text-sm text-red-700">{account.tokenErrorMessage}</p>
+                    ) : null}
+                  </div>
+
+                  <form action={disconnectSocialAccountAction}>
+                    <input type="hidden" name="socialAccountId" value={account.id} />
+                    <SubmitButton pendingLabel="Desconectando..." variant="secondary">
+                      Desconectar
+                    </SubmitButton>
+                  </form>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
 
         <form action={saveManusSettingsAction} className="space-y-6">
